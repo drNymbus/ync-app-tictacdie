@@ -1,8 +1,8 @@
 import { assertEquals } from "jsr:@std/assert";
-import { Role, Cell, Board, Player, Game } from "./tictacdie.ts";
+import * as ttd from "./tictacdie.ts";
 
 Deno.test("init game", () => {
-	const g = new Game({name:"player1"}, {name:"player2"});	
+	const g = new ttd.Game({name:"player1"}, {name:"player2"});	
 
 	assertEquals(g.board.length, 3);
 	assertEquals(g.board[0].length, 3);
@@ -15,27 +15,18 @@ Deno.test("init game", () => {
 		}
 	}
 });
+/*
+	tick() {}; // tick
+	isGameOver(): number {}; // isGameOver
 
-Deno.test("applyMove", () => {
-	const g = new Game({name:"player1"}, {name:"player2"});	
+	applyInvert(row: number, column: number) {}; // applyInvert
+	applyResize(top: boolean, bottom: boolean, left: boolean, right: boolean) {}; // applyResize
+	applyBomb(x: number, y: number) {}; // applyBomb
 
-	let res = g.applyMove(0, 0, "X");
-	assertEquals(res, true);
-	assertEquals(g.board[0][0], "X");
-
-	res = g.applyMove(0, 0, "O");
-	assertEquals(res, false);
-	assertEquals(g.board[0][0], "X");
-
-	res = g.applyMove(0, 0, "X");
-	assertEquals(res, false);
-
-	res = g.applyMove(1, 2, "X");
-	assertEquals(res, true);
-	assertEquals(g.board[2][1], "X");
-
-	res = g.applyMove(2, 0, "O");
-	assertEquals(res, true);
-	assertEquals(g.board[0][2], "O");
-	
-});
+	placeSymbol(x: number, y: number, s: Symbol) {}; // placeSymbol
+	placeNomad(x: number, y: number, dirx: number, diry: number) {}; // placeNomad
+	placeImmunity(x: number, y: number) {}; // placeImmunity
+	placeVirus(x: number, y: number) {}; // placeVirus
+	placeTrap(x: number, y: number, ax: number, ay: number) {}; // placeTrap
+	placeTTT(x: number, y: number) {}; // placeTTT
+*/
