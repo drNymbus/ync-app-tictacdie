@@ -316,3 +316,173 @@ Deno.test("placeTTT", () => {});
 	placeTrap(x: number, y: number, ax: number, ay: number) {}; // placeTrap
 	placeTTT(x: number, y: number) {}; // placeTTT
 */
+
+// ─── Validation générale ─────────────────────────────────────────────────────
+
+Deno.test("action - jouer hors de son tour: retourne false", () => {
+    const g = makeGame();
+    const [ok] = g.action(1, "symbol", 0, 0, 0, 0, ""); // c'est le tour de 0
+    assertEquals(ok, false);
+});
+
+Deno.test("action - player_index invalide: retourne false", () => {
+    const g = makeGame();
+    assertEquals(g.action(-1, "symbol", 0, 0, 0, 0, "")[0], false);
+    assertEquals(g.action(2,  "symbol", 0, 0, 0, 0, "")[0], false);
+});
+
+Deno.test("action - carte inconnue: retourne false", () => {
+    const g = makeGame();
+    const [ok] = g.action(0, "joker_inexistant", 0, 0, 0, 0, "");
+    assertEquals(ok, false);
+});
+
+// ─── Gestion des tours ───────────────────────────────────────────────────────
+
+Deno.test("action - le tour passe à l'adversaire après un succès", () => {
+    const g = makeGame();
+    g.action(0, "symbol", 0, 0, 0, 0, "");
+    const [ok] = g.action(1, "symbol", 1, 1, 0, 0, "O");
+    assertEquals(ok, true);
+    assertEquals(g.board[1][1], "O");
+});
+
+Deno.test("action - le tour ne passe pas après un échec", () => {
+    const g = makeGame();
+    g.action(0, "symbol", 0, 0, 0, 0, "O"); // échoue
+    const [ok] = g.action(1, "symbol", 0, 0, 0, 0, "X"); // joueur 1 ne doit pas pouvoir jouer
+    assertEquals(ok, false);
+});
+
+// ─── symbol ──────────────────────────────────────────────────────────────────
+
+Deno.test("action symbol - player 0 pose X", () => {
+    const g = makeGame();
+    const [ok] = g.action(0, "symbol", 1, 1, 0, 0, "X");
+    assertEquals(ok, true);
+    assertEquals(g.board[1][1], "X");
+});
+
+Deno.test("action symbol - player 1 pose O", () => {
+    const g = makeGame();
+    g.action(0, "symbol", 0, 0, 0, 0, "O");
+    const [ok] = g.action(1, "symbol", 1, 1, 0, 0, "O");
+    assertEquals(ok, true);
+    assertEquals(g.board[1][1], "O");
+});
+
+Deno.test("action symbol - case occupée: retourne false", () => {
+    const g = makeGame();
+    g.board[1][1] = "O";
+    const [ok] = g.action(0, "symbol", 1, 1, 0, 0, "X");
+    assertEquals(ok, false);
+});
+
+Deno.test("action symbol - hors bornes: retourne false", () => {
+    const g = makeGame();
+    assertEquals(g.action(0, "symbol", 99, 0,  0, 0, "")[0], false);
+    assertEquals(g.action(0, "symbol", 0,  99, 0, 0, "")[0], false);
+});
+
+// ─── invert ──────────────────────────────────────────────────────────────────
+
+Deno.test("action invert - row: inverse la ligne x", () => {
+    const g = makeGame();
+    g.board[0] = ["X", "O", "X"];
+    const [ok] = g.action(0, "invert", 1, 0, 0, 0, ""); // axis=0 (row), index=x=0
+    assertEquals(ok, true);
+    assertEquals(g.board[0], ["O", "X", "O"]);
+});
+
+Deno.test("action invert - col: inverse la colonne x", () => {
+    const g = makeGame();
+    g.board[0][0] = "X"; g.board[1][0] = "O"; g.board[2][0] = "X";
+    const [ok] = g.action(0, "invert", 0, 0, 1, 0, ""); // axis=1 (col), index=x=0
+    assertEquals(ok, true);
+    assertEquals(g.board[0][0], "O");
+    assertEquals(g.board[1][0], "X");
+    assertEquals(g.board[2][0], "O");
+});
+
+Deno.test("action invert - index hors bornes: retourne false", () => {
+    const g = makeGame();
+    assertEquals(g.action(0, "invert", 99, 0, 0, 0, "")[0], false);
+    assertEquals(g.action(0, "invert", 99, 0, 1, 0, "")[0], false);
+});
+
+// ─── bomb ────────────────────────────────────────────────────────────────────
+
+Deno.test("action bomb - vide la croix autour de (x, y)", () => {
+    const g = makeGame();
+    g.board = [
+        ["X", "O", "X"],
+        ["O", "X", "O"],
+        ["X", "O", "X"],
+    ];
+    const [ok] = g.action(0, "bomb", 1, 1, 0, 0, "");
+    assertEquals(ok, true);
+    assertEquals(g.board[1][1], ""); // centre
+    assertEquals(g.board[0][1], ""); // haut
+    assertEquals(g.board[2][1], ""); // bas
+    assertEquals(g.board[1][0], ""); // gauche
+    assertEquals(g.board[1][2], ""); // droite
+    assertEquals(g.board[0][0], "X"); // coins inchangés
+});
+
+Deno.test("action bomb - centre hors bornes: retourne false", () => {
+    const g = makeGame();
+    assertEquals(g.action(0, "bomb", 99, 0,  0, 0, "")[0], false);
+    assertEquals(g.action(0, "bomb", 0,  99, 0, 0, "")[0], false);
+});
+
+// ─── resize ──────────────────────────────────────────────────────────────────
+
+Deno.test("action resize - coin haut-gauche: board passe en 4x4", () => {
+    const g = makeGame();
+    // top=opt1=1, bottom=opt2=0, left=x=1, right=y=0
+    const [ok] = g.action(0, "resize", 1, 0, 1, 0, "");
+    assertEquals(ok, true);
+    assertEquals(g.board.length, 4);
+    assertEquals(g.board[0].length, 4);
+});
+
+Deno.test("action resize - coin bas-droit: board passe en 4x4", () => {
+    const g = makeGame();
+    // top=opt1=0, bottom=opt2=1, left=x=0, right=y=1
+    const [ok] = g.action(0, "resize", 0, 1, 0, 1, "");
+    assertEquals(ok, true);
+    assertEquals(g.board.length, 4);
+});
+
+Deno.test("action resize - aucun coin sélectionné: retourne false", () => {
+    const g = makeGame();
+    const [ok] = g.action(0, "resize", 0, 0, 0, 0, "");
+    assertEquals(ok, false);
+    assertEquals(g.board.length, 3); // board inchangé
+});
+
+// ─── trap ────────────────────────────────────────────────────────────────────
+
+Deno.test("action trap - pose le piège en (x, y) avec redirect (opt1, opt2)", () => {
+    const g = makeGame();
+    const [ok] = g.action(0, "trap", 0, 0, 2, 2, "");
+    assertEquals(ok, true);
+    assertEquals(g.board[0][0], { kind:"trap", newx: 2, newy: 2 });
+});
+
+Deno.test("action trap - case piège occupée: retourne false", () => {
+    const g = makeGame();
+    g.board[0][0] = "X";
+    assertEquals(g.action(0, "trap", 0, 0, 2, 2, "")[0], false);
+});
+
+Deno.test("action trap - redirect hors bornes: retourne false", () => {
+    const g = makeGame();
+    assertEquals(g.action(0, "trap", 0, 0, 99, 0, "")[0], false);
+    assertEquals(g.action(0, "trap", 0, 0, 0, 99, "")[0], false);
+});
+
+Deno.test("action trap - position du piège hors bornes: retourne false", () => {
+    const g = makeGame();
+    assertEquals(g.action(0, "trap", 99, 0, 1, 1, "")[0], false);
+});

@@ -77,6 +77,7 @@ export class Game {
 			}
 		}
 		// console.log("END", this.board);
+		this.turn++;
 	}; // tick	
 
 	// -1: not over; 0: draw; 1: player1; 2: player2
@@ -105,12 +106,7 @@ export class Game {
 			message = "bomb";
 
 		} else if (card === "symbol") {
-			let symbol;
-			if (opt1 === 0) symbol = "X" as Symbol;
-			if (opt1 === 1) symbol = "O" as Symbol;
-
-			if (symbol === undefined) return [false, "(symbol) invalid dirx parameter"];
-			res = this.placeSymbol(x, y, symbol);
+			res = this.placeSymbol(x, y, opt3 as Symbol);
 			message = "symbol";
 
 		} else if (card === "nomad") {
