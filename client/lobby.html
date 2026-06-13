@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>tictacdie — Lobby</title>
+  <link rel="stylesheet" href="lobby.css">
+</head>
+<body>
+
+  <!-- Bande supérieure : pseudo -->
+  <header id="pseudo-bar">
+    <input id="pseudo-input" type="text" placeholder="Ton pseudo" maxlength="20" autocomplete="off">
+    <button id="btn-save-pseudo">Enregistrer</button>
+    <span id="pseudo-status"></span>
+  </header>
+
+  <!-- Vue principale : liste des parties + créer -->
+  <section id="lobby-main">
+    <div id="open-games">
+      <h2>Parties en attente</h2>
+      <ul id="games-list"></ul>
+    </div>
+
+    <div id="create-zone" role="button" tabindex="0">
+      <span>Créer une partie</span>
+    </div>
+  </section>
+
+  <!-- Vue salle d'attente : après création ou rejoindre -->
+  <section id="room-view" hidden>
+    <div id="room-info">
+      <span>Code : <strong id="room-id"></strong></span>
+      <button id="btn-copy-id">Copier</button>
+    </div>
+
+    <ul id="players-list"></ul>
+
+    <div id="room-actions">
+      <button id="btn-ready">Je suis prêt</button>
+      <button id="btn-leave-room">Quitter</button>
+    </div>
+  </section>
+
+  <script type="module" src="lobby.js"></script>
+</body>
+</html>
