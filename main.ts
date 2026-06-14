@@ -32,30 +32,46 @@ wss.on("connection", (ws) => {
 	ws.on("message", (raw) => {
 		const state = handler.getState(ws);
 		if (state === "lobby") {
-			const m = JSON.parse(raw.toString()) as ClientLobbyMessage;
-			switch (m.type) {
-				case "signin":
-					if (m.name === "") return;
-					handler.register(ws, m.name);
-					break;
-				case "create":
-					handler.create(ws);
-					break;
-				case "join":
-					handler.join(ws, m.id);
-					break;
-				case "ready":
-					const start = handler.ready(ws);
-					if (start) state = "game";
-					break;
-				case "leave":
-					lobby.leave(ws);
-					break;
+			try {
+				const m = JSON.parse(raw.toString()) as msg.ClientLobbyMessage;
+				switch (m.type) {
+					case "signin":
+						if (m.name === "") return;
+						handler.register(ws, m.name);
+						break;
+					case "create":
+						handler.create(ws, m.id);
+						break;
+					case "join":
+						handler.join(ws, m.id);
+						break;
+					case "ready":
+						handler.ready(ws);
+						break;
+					case "leave":
+						handler.leave(ws);
+						break;
+					case "refresh":
+						handler.sendLobbies(ws);
+						break;
+				}
+			} catch (e) {
+				if (e instanceof Error) {
+					console.error(e.message);
+				} else { console.error(e); }
+				handler.error(ws, "Internal error");
 			}
 		} else if (state === "game") {
-			const m = JSON.parse(raw.toString()) as ClientGameMessage;
-			if (m.type !== "action") return;
-			handler.gameAction(ws, m);
+			try {
+				const m = JSON.parse(raw.toString()) as msg.ClientGameMessage;
+				if (m.type !== "action") return;
+				handler.action(ws, m);
+			} catch (e) {
+				if (e instanceof Error) {
+					console.error(e.message);
+				} else { console.error(e); }
+				handler.error(ws, "Internal error");
+			}
 		}
 	});
 

@@ -19,7 +19,7 @@ export class Game {
 	p1: Player;
 	p2: Player;
 
-	constructor(p1: Player, p2: Player) {
+	constructor(seed: number, p1: Player, p2: Player) {
 		this.board = [
 			["", "", ""],
 			["", "", ""],
