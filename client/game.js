@@ -15,6 +15,7 @@ let myIndex = 0;          // 1 | 2
 let mySymbol = "";        // "X" | "O"
 let oppSymbol = "";
 let myName = "";
+let oppName = "";
 let myTurn = false;
 let myJokers = [];             // 4 jokers tirés via la seed
 let selectedJokerIndex = null; // index du joker sélectionné dans myJokers
@@ -25,6 +26,38 @@ let gameOverResult = null;     // null tant que la partie n'est pas finie ; 0/1/
 
 let root = null;          // racine DOM de la vue game
 
+// --- Dérivation seed (réplique exacte de shared/random.ts + Game.constructor) ---
+function seededRng(seed) {
+	let state = seed;
+	return () => {
+		state = (state * 1664525 + 1013904223) & 0xffffffff;
+		return (state >>> 0) / 0xffffffff;
+	};
+}
+function randInt(seed, min, max) {
+	const rng = seededRng(seed);
+	return Math.floor(rng() * (max - min + 1)) + min;
+}
+function deriveFromSeed(seed, isPlayer1) {
+	const turn = randInt(seed, 0, 1);
+	const pool = ["invert", "resize", "bomb", "nomad", "immunity", "trap", "virus"];
+	const jokers = [...pool];
+	const picked = [];
+	for (let i = 0; i < 4; i++) {
+		// clamp : max=jokers.length dans le serveur peut sortir des bornes, on sécurise
+		const idx = Math.min(randInt(seed, 0, jokers.length), jokers.length - 1);
+		picked.push(jokers[idx]);
+		jokers.splice(idx, 1);
+	}
+	// 1 - turn%2 = index 0-based du joueur qui joue en premier
+	const firstToPlay = 1 - turn % 2;
+	return {
+		symbol: isPlayer1 ? "X" : "O",
+		myTurn: isPlayer1 ? firstToPlay === 0 : firstToPlay === 1,
+		jokers: picked,
+	};
+}
+
 // --- Cycle de vie ---
 export function init(socket, startMsg) {
 	ws = socket;
@@ -32,14 +65,13 @@ export function init(socket, startMsg) {
 	// Identité : matching pseudo <-> player1/player2 (cf. protocol.ts)
 	myName = sessionStorage.getItem("nickname") ?? "";
 	myIndex = (myName === startMsg.player1) ? 1 : 2;
+	oppName = (myIndex === 1) ? startMsg.player2 : startMsg.player1;
 
-	// TODO(seed): dériver symbole / qui commence / 4 jokers depuis startMsg.seed
-	// via la logique partagée. Placeholders pour le rendu statique :
-	mySymbol = (myIndex === 1) ? "X" : "O";
-	oppSymbol = (mySymbol === "X") ? "O" : "X";
-	myTurn = (myIndex === 1);
-	// TEMP : types réels en attendant la dérivation par seed, pour tester les sous-flux.
-	myJokers = ["trap", "nomad", "invert", "resize"];
+	const derived = deriveFromSeed(startMsg.seed, myIndex === 1);
+	mySymbol = derived.symbol;
+	oppSymbol = mySymbol === "X" ? "O" : "X";
+	myTurn = derived.myTurn;
+	myJokers = derived.jokers;
 
 	// Board de départ : 3x3 vide — sera remplacé par game.board une fois Game branché.
 	board = [["", "", ""], ["", "", ""], ["", "", ""]];
@@ -85,7 +117,7 @@ function renderPlayers() {
 	const el = root.querySelector("#players");
 	el.innerHTML = `
 		<span class="me">${myName} (${mySymbol})</span>
-		<span class="opp">Adversaire (${oppSymbol})</span>
+		<span class="opp">${oppName} (${oppSymbol})</span>
 	`;
 }
 
@@ -281,7 +313,9 @@ function onCellClick(x, y) {
 			sendAction({ type: "action", card, x, y, opt1: 0, opt2: 0, opt3: "" });
 			break;
 		case "trap":   onTrapClick(x, y);   break;
-		case "nomad":  if (flow.step === 1) onNomadClick(x, y); break; // étape 2 via flèches
+		case "nomad":
+			if (flow.step === 1 && (x === 0 || x === board[0].length - 1 || y === 0 || y === board.length - 1)) onNomadClick(x, y);
+			break; // étape 2 via flèches
 		case "invert": onInvertClick(x, y); break;
 		// resize : pas un clic de case, géré par les boutons de coin.
 	}
@@ -346,19 +380,56 @@ function sendAction(action) {
 		// Le serveur n'accuse pas le succès (pas de "ok" en jeu) : on applique en optimiste.
 		// En cas de refus, le "ko" renvoie le board pour resync (cf. onServerMessage).
 		ws.send(JSON.stringify(action));
-		applyLocalTEMP(action); // TODO: remplacer par game.action(myIndex - 1, ...) une fois Game branché
-		setTurn(false);         // la main passe à l'adversaire
+		applyLocalTEMP(action);
+		localTick();
+		setTurn(false);
 	} else {
 		// Bootstrap local (pas de serveur) : applique et garde la main pour tester l'UI.
 		console.log("ACTION ->", action);
 		applyLocalTEMP(action);
+		localTick();
 	}
 
 	resetSelection();
 	renderAll();
 }
 
-// TEMP : mutation locale grossière pour visualiser, à supprimer une fois Game branché.
+// Réplique exacte de Game.tick() (shared/tictacdie.ts) pour maintenir le board client en sync.
+function localTick() {
+	const rows = board.length, cols = board[0].length;
+	for (let j = 0; j < rows; j++) {
+		for (let i = 0; i < cols; i++) {
+			const cell = board[j][i];
+			if (typeof cell !== "object") continue;
+			if (cell.kind === "nomad") {
+				if (cell.cooldown >= 0) cell.cooldown--;
+				if (cell.cooldown < 0) {
+					board[j][i] = cell.old_content;
+					const nx = i + cell.dirx, ny = j + cell.diry;
+					if (nx >= 0 && nx < cols && ny >= 0 && ny < rows) {
+						cell.old_content = board[ny][nx];
+						board[ny][nx] = cell;
+					}
+					if (cell.dirx > 0 || cell.diry > 0) cell.cooldown = 1;
+				}
+			} else if (cell.kind === "immunity") {
+				cell.cooldown--;
+				if (cell.cooldown < 0) board[j][i] = cell.content;
+			} else if (cell.kind === "virus") {
+				let x = 0, o = 0;
+				for (const [dy, dx] of [[-1,0],[1,0],[-1,-1],[0,-1],[1,-1],[-1,1],[0,1],[1,1]]) {
+					const ni = i + dx, nj = j + dy;
+					if (ni >= 0 && ni < cols && nj >= 0 && nj < rows) {
+						if (board[nj][ni] === "X") x++;
+						if (board[nj][ni] === "O") o++;
+					}
+				}
+				cell.content = x > o ? "X" : o > x ? "O" : "";
+			}
+		}
+	}
+}
+
 function applyLocalTEMP(a) {
 	const { card, x, y, opt1, opt2, opt3 } = a;
 	const flip = (c) => (c === "X" ? "O" : c === "O" ? "X" : c);
@@ -398,9 +469,13 @@ function setTurn(b) {
 // "gameover" (result, -1 = pas fini), "closing" (fermeture serveur).
 function onServerMessage(m) {
 	switch (m.type) {
+		case "ok":
+			break; // action acceptée côté serveur, déjà appliquée en optimiste
+
 		case "action":
 			// Coup de l'adversaire transmis tel quel : on l'applique, puis c'est à moi.
-			applyLocalTEMP(m); // TODO: game.action(m.player - 1, m.card, ...) une fois Game branché
+			applyLocalTEMP(m);
+			localTick();
 			setTurn(true);
 			renderAll();
 			break;

@@ -53,9 +53,6 @@ wss.on("connection", (ws) => {
 					case "leave":
 						handler.leave(ws);
 						break;
-					case "refresh":
-						handler.sendLobbies(ws);
-						break;
 				}
 			} catch (e) {
 				if (e instanceof Error) {

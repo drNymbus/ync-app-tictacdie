@@ -42,7 +42,12 @@ function onMessage(m) {
 	switch (m.type) {
 		case "lobbies":
 			lobbies = m.lobbies ?? [];
-			if (view === "signin") view = "browse"; // 1er "lobbies" = signin accepté
+			// "lobbies" = confirmation de signin (signin→browse) OU réponse implicite à leave (waiting→browse)
+			if (view === "signin" || pending === "leave") {
+				view = "browse";
+				if (pending === "leave") { myReady = false; currentLobby = ""; }
+				pending = null;
+			}
 			render();
 			break;
 
@@ -158,15 +163,12 @@ function renderBrowse() {
 		root.appendChild(line);
 	});
 
-	const refresh = el("button", { textContent: "Rafraîchir" });
-	refresh.addEventListener("click", () => send({ type: "refresh" }));
-
 	// Création
 	const idInput = el("input", { placeholder: "Nom du salon" });
 	const create = el("button", { textContent: "Créer" });
 	create.addEventListener("click", () => onCreate(idInput.value.trim()));
 
-	root.append(refresh, el("hr"), h2("Créer un salon"), idInput, create);
+	root.append(el("hr"), h2("Créer un salon"), idInput, create);
 }
 
 function renderWaiting() {
