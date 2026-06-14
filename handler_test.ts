@@ -4,7 +4,7 @@ import * as handler from "./handler.ts";
 import * as msg from "./shared/protocol.ts";
 
 type MockWs = {
-	send: (data: unknown) => void;
+	send: (data: string) => void;
 	close: () => void;
 	received: unknown[];
 	closed: boolean;
@@ -14,7 +14,7 @@ function mockWs(): MockWs {
 	const ws: MockWs = {
 		received: [],
 		closed: false,
-		send(data: unknown) { ws.received.push(data); },
+		send(data: string) { ws.received.push(JSON.parse(data)); },
 		close() { ws.closed = true; },
 	};
 	return ws;
@@ -221,7 +221,7 @@ Deno.test("leave - sends ok", () => {
 	handler.create(cast(a), "lobby-1");
 	handler.join(cast(b), "lobby-1");
 	handler.leave(cast(b));
-	assertEquals((last(b) as msg.ServerLobbyMessage).type, "ok");
+	assertEquals((last(b) as msg.ServerLobbyMessage).type, "lobbies");
 });
 
 Deno.test("leave - player can rejoin another lobby after leaving", () => {
