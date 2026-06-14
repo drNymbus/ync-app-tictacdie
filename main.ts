@@ -1,8 +1,8 @@
 import { createServer } from "http";
 import { readFileSync } from "fs";
 import { join } from "path";
-import { WebSocketServer } from "ws";
-import type { ClientMsg } from "./shared/protocol";
+import { WebSocketServer } from "npm:ws";
+import * as msg from "./shared/protocol";
 import * as lobby from "./lobby";
 
 const page = (f: string) => readFileSync(join("client", f), "utf8");
@@ -13,7 +13,7 @@ const server = createServer((req, res) => {
 	if (url.pathname === "/") {
 		res.end(page("index.html"));
 	} else if (url.pathname === "/game") {
-		res.end(page("game.html");
+		res.end(page("game.html"));
 	} else if (url.pathname === "/lobby.js") {
 		res.setHeader("content-type", "text/javascript");
 		res.end(page("lobby.js"));
@@ -30,11 +30,36 @@ const wss = new WebSocketServer({ server });
 
 wss.on("connection", (ws) => {
 	ws.on("message", (raw) => {
-		const m = JSON.parse(raw.toString()) as ClientMsg;
+		const state = handler.getState(ws);
+		if (state === "lobby") {
+			const m = JSON.parse(raw.toString()) as ClientLobbyMessage;
+			switch (m.type) {
+				case "signin":
+					if (m.name === "") return;
+					handler.register(ws, m.name);
+					break;
+				case "create":
+					handler.create(ws);
+					break;
+				case "join":
+					handler.join(ws, m.id);
+					break;
+				case "ready":
+					const start = handler.ready(ws);
+					if (start) state = "game";
+					break;
+				case "leave":
+					lobby.leave(ws);
+					break;
+			}
+		} else if (state === "game") {
+			const m = JSON.parse(raw.toString()) as ClientGameMessage;
+			if (m.type !== "action") return;
+			handler.gameAction(ws, m);
+		}
 	});
 
-	ws.on("close", () => {
-	});
+	ws.on("close", () => { handler.close(ws); });
 });
 
 server.listen(3000, () => console.log("http://localhost:3000"));
