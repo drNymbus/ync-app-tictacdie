@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { WebSocketServer } from "npm:ws";
+import { WebSocketServer, WebSocket } from "npm:ws";
 import * as msg from "./shared/protocol.ts";
 import * as handler from "./handler.ts";
 
@@ -26,8 +26,8 @@ const server = createServer((req, res) => {
 
 const wss = new WebSocketServer({ server });
 
-wss.on("connection", (ws) => {
-	ws.on("message", (raw) => {
+wss.on("connection", (ws: WebSocket) => {
+	ws.on("message", (raw: Event) => {
 		const state = handler.getState(ws);
 		if (state === "register") {
 			const m = JSON.parse(raw.toString()) as msg.ClientLobbyMessage;
