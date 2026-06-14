@@ -101,56 +101,40 @@ export class Game {
 			return cell;
 		}
 	}
-
-	#rowWin(row: number): number {
-		const baseSymbol = this.#getCellSymbol(this.board[row][0]);
-		for (let x=0; x < this.board[0].length; x++) {
-			if (baseSymbol !== this.#getCellSymbol(this.board[row][x])) return -1;
-		}
-		return (baseSymbol === this.p1.symbol) ? 1 : 2;
-	}
-	#colWin(col: number): number {
-		const baseSymbol = this.#getCellSymbol(this.board[0][col]);
-		for (let y=0; y < this.board.length; y++) {
-			if (baseSymbol !== this.#getCellSymbol(this.board[y][col])) return -1;
-		}
-		return (baseSymbol === this.p1.symbol) ? 1 : 2;
-	}
-	#diagonalWin(): number {
-		let diag = true, inv_diag = true;
-		const baseSymbol = this.#getCellSymbol(this.board[0][0]);
-		const inv_baseSymbol = this.#getCellSymbol(this.board[0][0]);
-		for (let i=0; i < this.board.length; i++) {
-			if (diag === true && baseSymbol !== this.#getCellSymbol(this.board[i][i])) diag = false;
-			if (inv_diag === true && inv_baseSymbol !== this.#getCellSymbol(this.board[this.board.length-1-i][i])) inv_diag = false
-			if (!diag && !inv_diag) return -1;
-		}
-
-		if (diag) return (baseSymbol === this.p1.symbol) ? 1 : 2;
-		if (inv_diag) return (inv_baseSymbol === this.p1.symbol) ? 1 : 2;
-		return -1;
-	}
-	#boardFilled(): boolean {
-		for (let y=0; y < this.board.length; y++) {
-			for (let x=0; x < this.board[0].length; x++) {
-				if (this.#getCellSymbol(this.board[0][0]) === "") return false;
-			}
-		}
-		return true;
-	}
-
 	// -1: not over; 0: draw; 1: player1; 2: player2
 	isGameOver(): number {
-		let over = -1;
+		let filled = true; // flag if board contains an empty cell
+
+		let diagSymbol = this.#getCellSymbol(this.board[0][0]);
+		let diag = (diagSymbol !== "");
+		let inv_diagSymbol = this.#getCellSymbol(this.board[this.board.length-1][0]);
+		let inv_diag = (inv_diagSymbol !== "");
+
 		for (let i=0; i < this.board.length; i++) {
-			const rowWinner = this.#rowWin(i)
-			if (rowWinner !== -1) return rowWinner;
-			const colWinner = this.#colWin(i);
-			if (colWinner !== -1) return colWinner;
+			let rowSymbol = this.#getCellSymbol(this.board[i][0]);
+			let rowWinner = (rowSymbol !== "");
+			let colSymbol = this.#getCellSymbol(this.board[0][i]);
+			let colWinner = (colSymbol !== "");
+
+			for (let j=1; j < this.board.length; j++) {
+				if (filled && this.#getCellSymbol(this.board[i][j]) === "") filled = false;
+
+				if (rowWinner && rowSymbol !== this.#getCellSymbol(this.board[i][j])) rowWinner = false;
+				if (colWinner && colSymbol !== this.#getCellSymbol(this.board[j][i])) colWinner = false;
+				if (!rowWinner && !colWinner) break;
+			}
+			
+			if (rowWinner) return (rowSymbol === this.p1.symbol) ? 1 : 2;
+			if (colWinner) return (colSymbol === this.p1.symbol) ? 1 : 2;
+
+			if (diag && diagSymbol !== this.#getCellSymbol(this.board[i][i])) diag = false;
+			if (inv_diag && inv_diagSymbol !== this.#getCellSymbol(this.board[this.board.length-1-i][i])) inv_diag = false;
 		}
-		const diagWinner = this.#diagonalWin();
-		if (diagWinner !== -1) return this.#diagonalWin();
-		return this.#boardFilled() ? 0 : -1;
+
+		if (diag) return (diagSymbol === this.p1.symbol) ? 1 : 2;
+		if (inv_diag) return (inv_diagSymbol === this.p1.symbol) ? 1 : 2;
+
+		return filled ? 0 : -1;
 	}; // isGameOver
 
 	action(player_index: number, card: string, x: number, y:number, opt1: number, opt2: number, opt3: string): [boolean, string] {
