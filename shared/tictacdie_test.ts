@@ -2,11 +2,11 @@ import { assertEquals } from "jsr:@std/assert";
 import * as ttd from "./tictacdie.ts";
 
 function makeGame(): ttd.Game {
-	return new ttd.Game({ name: "p1" }, { name: "p2" });
+	return new ttd.Game(0, { name: "p1" }, { name: "p2" });
 }
 
 Deno.test("init Game", () => {
-	const g = new ttd.Game({name:"player1"}, {name:"player2"});	
+	const g = makeGame();
 
 	assertEquals(g.board.length, 3);
 	assertEquals(g.board[0].length, 3);
@@ -37,7 +37,8 @@ Deno.test("applyInvert", () => {
 });
 
 Deno.test("placeSymbol", () => {
-	const g = new ttd.Game({name:"player1"}, {name:"player2"});	
+	const g = makeGame();
+
 	g.placeSymbol(0, 0, "X");
 	assertEquals(g.board[0][0], "X");
 
@@ -46,7 +47,7 @@ Deno.test("placeSymbol", () => {
 });
 
 Deno.test("placeNomad", () => {
-	const g = new ttd.Game({name:"player1"}, {name:"player2"});	
+	const g = makeGame();
 
 	g.placeNomad(0, 0, 1, 0, "X");
 	g.tick();
@@ -69,7 +70,7 @@ Deno.test("placeNomad", () => {
 });
 
 Deno.test("placeImmunity", () => {
-	const g = new ttd.Game({name:"player1"}, {name:"player2"});	
+	const g = makeGame();
 	
 	g.placeImmunity(0, 0);
 	assertEquals(g.board[0][0], {kind: "immunity", cooldown:2, content: ""});
@@ -81,7 +82,7 @@ Deno.test("placeImmunity", () => {
 });
 
 Deno.test("placeVirus", () => {
-	const g = new ttd.Game({name:"player1"}, {name:"player2"});	
+	const g = makeGame();
 
 	g.placeVirus(0, 0);
 	assertEquals(g.board[0][0], {kind: "virus", content: ""});
