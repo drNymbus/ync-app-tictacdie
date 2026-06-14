@@ -1,9 +1,9 @@
-import { createServer } from "http";
-import { readFileSync } from "fs";
-import { join } from "path";
+import { createServer } from "node:http";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { WebSocketServer } from "npm:ws";
-import * as msg from "./shared/protocol";
-import * as lobby from "./lobby";
+import * as msg from "./shared/protocol.ts";
+import * as handler from "./handler.ts";
 
 const page = (f: string) => readFileSync(join("client", f), "utf8");
 
