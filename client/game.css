@@ -1,0 +1,62 @@
+/* game.css — mise en forme de la vue de partie.
+   Styles minimaux en attendant la maquette Pencil / illustrations / animations.
+   Note : la largeur des colonnes de #board (grid-template-columns) reste pilotée
+   par game.js car elle dépend de la taille courante du board (N peut changer au Resize). */
+
+/* --- Grille --- */
+#board {
+	display: grid;
+	gap: 4px;
+	position: relative; /* ancrage des flèches de coin (resize) */
+}
+
+.cell {
+	width: 48px;
+	height: 48px;
+	border: 1px solid #888;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+}
+
+.cell.selected {
+	background: #cdf; /* surbrillance d'un sous-flux (trap/nomad/invert) */
+}
+
+/* --- Cartes (4 jokers + symbole) --- */
+#jokers {
+	display: flex;
+	align-items: center;
+}
+
+.card {
+	cursor: pointer;
+	padding: 8px 12px;
+	margin: 4px;
+	border: 1px solid #888;
+}
+
+.card.selected {
+	outline: 2px solid #4af;
+}
+
+.card.symbol {
+	margin-left: 24px; /* décalage "soit un joker, soit ton symbole" */
+}
+
+/* --- Flèches de direction (nomad) --- */
+.arrow {
+	margin: 2px;
+}
+
+/* --- Flèches de coin (resize) : par-dessus la grille --- */
+.corner {
+	position: absolute;
+	z-index: 10;
+}
+
+.corner-tl { top: 0;    left: 0; }
+.corner-tr { top: 0;    right: 0; }
+.corner-bl { bottom: 0; left: 0; }
+.corner-br { bottom: 0; right: 0; }
