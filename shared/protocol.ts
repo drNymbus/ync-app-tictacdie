@@ -12,7 +12,7 @@ export type ServerLobbyMessage =
 	| {type: "lobbies", lobbies: LobbyView[]}
 	| {type: "ok"}
 	| {type: "ko", message: string}
-	| {type: "start", player1: string, player2: string}
+	| {type: "start", seed: number, player1: string, player2: string}
 	| {type: "closing"};
 
 export type ClientGameMessage = {
