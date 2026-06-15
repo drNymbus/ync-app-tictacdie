@@ -182,6 +182,16 @@ function renderWaiting() {
 	const leave = el("button", { textContent: "Quitter" });
 	leave.addEventListener("click", () => onLeave());
 	root.append(ready, leave);
+
+	// DEBUG : lance la vue jeu sans adversaire (à retirer en prod)
+	const debug = el("button", { textContent: "⚙ Lancer (solo debug)" });
+	debug.style.cssText = "margin-left:24px;opacity:0.5;font-size:0.85em";
+	debug.addEventListener("click", () => {
+		const name = sessionStorage.getItem("nickname") ?? "Joueur1";
+		teardown();
+		gameInit(ws, { type: "start", seed: 0, player1: name, player2: "Bot" });
+	});
+	root.append(debug);
 }
 
 // --- Petits helpers DOM ---

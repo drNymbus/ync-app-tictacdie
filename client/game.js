@@ -18,6 +18,8 @@ let myName = "";
 let oppName = "";
 let myTurn = false;
 let myJokers = [];             // 4 jokers tirés via la seed
+let usedJokers = [];           // parallèle à myJokers : true = joker déjà consommé (usage unique)
+let pendingJokerIndex = null;  // index du joker consommé en optimiste (rollback sur ko)
 let selectedJokerIndex = null; // index du joker sélectionné dans myJokers
 let symbolSelected = false;    // true si la 5e carte (pose de symbole) est sélectionnée
 let flow = null;               // état du sous-flux multi-étapes en cours
@@ -25,6 +27,11 @@ let pendingAction = null;      // dernière action envoyée (pour rollback éven
 let gameOverResult = null;     // null tant que la partie n'est pas finie ; 0/1/2 ensuite
 
 let root = null;          // racine DOM de la vue game
+
+// DEBUG : true => le joueur reçoit TOUS les jokers (pour tester chaque pouvoir).
+// Repasser à false pour le tirage normal par seed. (à retirer en prod)
+const DEBUG_ALL_JOKERS = true;
+const ALL_JOKERS = ["invert", "resize", "bomb", "nomad", "immunity", "trap", "virus"];
 
 // --- Dérivation seed (réplique exacte de shared/random.ts + Game.constructor) ---
 function seededRng(seed) {
@@ -71,7 +78,8 @@ export function init(socket, startMsg) {
 	mySymbol = derived.symbol;
 	oppSymbol = mySymbol === "X" ? "O" : "X";
 	myTurn = derived.myTurn;
-	myJokers = derived.jokers;
+	myJokers = DEBUG_ALL_JOKERS ? [...ALL_JOKERS] : derived.jokers;
+	usedJokers = myJokers.map(() => false); // aucun joker consommé au départ
 
 	// Board de départ : 3x3 vide — sera remplacé par game.board une fois Game branché.
 	board = [["", "", ""], ["", "", ""], ["", "", ""]];
@@ -167,10 +175,14 @@ function renderJokers() {
 	const el = root.querySelector("#jokers");
 	el.innerHTML = "";
 
-	// 4 jokers
+	// 4 jokers — un joker consommé est grisé et non cliquable (usage unique).
 	myJokers.forEach((j, i) => {
 		const card = makeCard(j, i === selectedJokerIndex);
-		card.addEventListener("click", () => onJokerSelect(i));
+		if (usedJokers[i]) {
+			card.classList.add("used");
+		} else {
+			card.addEventListener("click", () => onJokerSelect(i));
+		}
 		el.appendChild(card);
 	});
 
@@ -265,6 +277,7 @@ function resetSelection() {
 // --- Interactions ---
 function onJokerSelect(index) {
 	if (!myTurn) return;
+	if (usedJokers[index]) return; // joker déjà utilisé
 	const wasSelected = (selectedJokerIndex === index);
 	resetSelection();
 	if (!wasSelected) { selectedJokerIndex = index; setupFlow(myJokers[index]); } // re-clic = désélection
@@ -376,6 +389,13 @@ function sendAction(action) {
 	action.player = myIndex; // requis par ClientGameMessage (cf. protocol.ts)
 	pendingAction = action;
 
+	// Usage unique : on consomme le joker en optimiste (rollback sur "ko").
+	// La 5e carte (symbole) n'est pas un joker et reste toujours disponible.
+	if (action.card !== "symbol" && selectedJokerIndex !== null) {
+		pendingJokerIndex = selectedJokerIndex;
+		usedJokers[selectedJokerIndex] = true;
+	}
+
 	if (ws) {
 		// Le serveur n'accuse pas le succès (pas de "ok" en jeu) : on applique en optimiste.
 		// En cas de refus, le "ko" renvoie le board pour resync (cf. onServerMessage).
@@ -434,7 +454,22 @@ function applyLocalTEMP(a) {
 	const { card, x, y, opt1, opt2, opt3 } = a;
 	const flip = (c) => (c === "X" ? "O" : c === "O" ? "X" : c);
 	if (card === "symbol") {
-		board[y][x] = opt3;
+		// Réplique exacte de placeSymbol (shared/tictacdie.ts) : gère la redirection des pièges.
+		const cell = board[y][x];
+		if (typeof cell === "object" && cell.kind === "trap") {
+			if (board[cell.newy][cell.newx] === "") {
+				board[y][x] = "";                    // redirect libre : le piège disparaît
+				board[cell.newy][cell.newx] = opt3;  // le symbole part sur la redirect
+			} else {
+				board[y][x] = opt3;                  // redirect occupée : le symbole reste sur le piège
+			}
+		} else if (cell === "") {
+			board[y][x] = opt3;
+		}
+		// case occupée non-piège : rien (le serveur refusera, cf. placeSymbol)
+	} else if (card === "trap") {
+		// Piège invisible au rendu mais stocké pour reproduire la redirection localement.
+		board[y][x] = { kind: "trap", newx: opt1, newy: opt2 };
 	} else if (card === "immunity") {
 		board[y][x] = { kind: "immunity", cooldown: 2, content: board[y][x] };
 	} else if (card === "virus") {
@@ -456,7 +491,6 @@ function applyLocalTEMP(a) {
 		for (let r = 0; r < n; r++) for (let c = 0; c < old[r].length; c++) nb[r + rowOff][c + colOff] = old[r][c];
 		board = nb;
 	}
-	// trap : invisible, rien à afficher.
 }
 
 function setTurn(b) {
@@ -470,7 +504,8 @@ function setTurn(b) {
 function onServerMessage(m) {
 	switch (m.type) {
 		case "ok":
-			break; // action acceptée côté serveur, déjà appliquée en optimiste
+			pendingJokerIndex = null; // action acceptée : la consommation du joker est confirmée
+			break;
 
 		case "action":
 			// Coup de l'adversaire transmis tel quel : on l'applique, puis c'est à moi.
@@ -483,6 +518,7 @@ function onServerMessage(m) {
 		case "ko":
 			// Action refusée : resync autoritatif via le board renvoyé, la main me revient.
 			if (m.board) board = m.board;
+			if (pendingJokerIndex !== null) { usedJokers[pendingJokerIndex] = false; pendingJokerIndex = null; } // rollback du joker
 			console.warn("Action refusée :", m.message);
 			setTurn(true);
 			renderAll();

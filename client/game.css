@@ -41,6 +41,12 @@
 	outline: 2px solid #4af;
 }
 
+.card.used {
+	opacity: 0.35;
+	cursor: not-allowed;
+	text-decoration: line-through;
+}
+
 .card.symbol {
 	margin-left: 24px; /* décalage "soit un joker, soit ton symbole" */
 }
