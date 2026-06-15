@@ -30,7 +30,7 @@ export class Game {
 			["", "", ""]
 		];
 		this.p1 = {name: p1, symbol: "X", jokers: []} as Player;
-		this.p2 = {name: p1, symbol: "O", jokers: []} as Player;
+		this.p2 = {name: p2, symbol: "O", jokers: []} as Player;
 		this.turn = rand.randInt(seed, 0,1);
 		
 		const jokers = ["invert", "resize", "bomb", "nomad", "immunity", "trap", "virus"]; //, "ttt"];

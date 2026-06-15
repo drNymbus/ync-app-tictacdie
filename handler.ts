@@ -235,9 +235,9 @@ export function action(ws: WebSocket, action: msg.ClientGameMessage) {
 	} as msg.ClientGameMessage
 
 	if (action.player === 1) {
-		game.player2.send(action_msg);
+		game.player2.send(JSON.stringify(action_msg));
 	} else if (action.player === 2) {
-		game.player1.send(action_msg);
+		game.player1.send(JSON.stringify(action_msg));
 	}
 
 	const over = game.game.isGameOver();
