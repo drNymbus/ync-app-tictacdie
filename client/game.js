@@ -22,7 +22,9 @@ let usedJokers = [];           // parallèle à myJokers : true = joker déjà c
 let pendingJokerIndex = null;  // index du joker consommé en optimiste (rollback sur ko)
 let selectedJokerIndex = null; // index du joker sélectionné dans myJokers
 let jokerEls = [];             // cartes jokers persistantes [{card, img, base}] (pour animer hover/select/fade)
-let symCardEl = null;          // carte symbole persistante (5e)
+let handCards = [];            // éléments .card des jokers, pour calculer l'éventail
+let hoverIndex = null;         // index de la carte survolée (écarte les voisines)
+let symCardEl = null;          // jeton symbole (hors de la main)
 let symbolSelected = false;    // true si la 5e carte (pose de symbole) est sélectionnée
 let flow = null;               // état du sous-flux multi-étapes en cours
 let pendingAction = null;      // dernière action envoyée (pour rollback éventuel sur ko)
@@ -52,6 +54,31 @@ function jokerAsset(base, selected) {
 // Asset APNG d'un symbole posé (X / O).
 function symbolAsset(sym) {
 	return `/assets/XOXO_${sym}.png`;
+}
+
+// Animations d'effet jouées une fois, centrées sur la case ciblée { base, ms (durée mesurée), size px }.
+const EFFECTS = {
+	bomb: { base: "BOMBOCLAAT_ANIM", ms: 2240, size: 300 },
+	// immunity: { base: "IMMUNITE_ANIM", ... }, virus: { base: "VIRUS_ANIM", ... } — à venir
+};
+
+// Joue l'animation d'effet d'une carte, centrée sur le centre de la case (x, y), puis la retire.
+function playEffect(card, x, y) {
+	const fx = EFFECTS[card];
+	if (!fx) return;
+	// rAF : attend que le board soit (re)rendu pour lire la position réelle de la case.
+	requestAnimationFrame(() => {
+		if (!root) return;
+		const cell = root.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`);
+		if (!cell) return;
+		const r = cell.getBoundingClientRect();
+		const img = el("img", { className: "effect", src: `/assets/${fx.base}.png?t=${Date.now()}`, alt: "" });
+		img.style.left = (r.left + r.width / 2) + "px"; // centre de l'anim = centre de la case
+		img.style.top = (r.top + r.height / 2) + "px";
+		img.style.width = fx.size + "px";
+		root.appendChild(img);
+		setTimeout(() => img.remove(), fx.ms); // retiré après une lecture (l'APNG boucle sinon)
+	});
 }
 
 // --- Dérivation seed (réplique exacte de shared/random.ts + Game.constructor) ---
@@ -229,7 +256,8 @@ function renderPlayers() {
 
 // Pastille joueur : symbole (APNG XOXO) + nom. mirror = nom à gauche du symbole (adversaire).
 function chip(name, sym, active, mirror) {
-	const c = el("div", { className: active ? "chip active" : "chip" });
+	// chip-x / chip-o : couleur d'allumage de l'encart selon le symbole du joueur.
+	const c = el("div", { className: `chip chip-${sym === "X" ? "x" : "o"}${active ? " active" : ""}` });
 	const icon = el("img", { className: "sym-icon", src: symbolAsset(sym), alt: sym });
 	const nm = el("span", { className: active ? "pname" : "pname dim", textContent: name || "—" });
 	if (mirror) c.append(nm, icon);
@@ -299,9 +327,9 @@ function buildJokers() {
 	el.innerHTML = "";
 	jokerEls = [];
 
-	// Encart regroupant les 4 jokers.
-	const jokerGroup = document.createElement("div");
-	jokerGroup.className = "joker-group";
+	handCards = [];
+	hoverIndex = null;
+
 	myJokers.forEach((j, i) => {
 		const card = document.createElement("div");
 		card.className = "card joker";
@@ -316,31 +344,60 @@ function buildJokers() {
 			card.classList.add("text"); // fallback joker sans visuel (ex: ttt)
 			card.textContent = j;
 		}
-		// Listener attaché une fois ; onJokerSelect ignore déjà les jokers consommés.
 		card.addEventListener("click", () => onJokerSelect(i));
-		// Survol : joue l'anim SELECTED (revient à IDLE en sortant, sauf si la carte est sélectionnée).
-		if (img) {
-			card.addEventListener("mouseenter", () => { if (!usedJokers[i]) img.src = jokerAsset(base, true); });
-			card.addEventListener("mouseleave", () => { if (!usedJokers[i]) img.src = jokerAsset(base, i === selectedJokerIndex); });
-		}
-		jokerGroup.appendChild(card);
+		// Survol : anim SELECTED + écarte les voisines (layoutFan).
+		card.addEventListener("mouseenter", () => {
+			if (usedJokers[i]) return;
+			hoverIndex = i;
+			if (img && base) img.src = jokerAsset(base, true);
+			layoutFan();
+		});
+		card.addEventListener("mouseleave", () => {
+			if (usedJokers[i]) return;
+			hoverIndex = null;
+			if (img && base) img.src = jokerAsset(base, i === selectedJokerIndex);
+			layoutFan();
+		});
+		el.appendChild(card);
 		jokerEls.push({ card, img, base });
+		handCards.push(card);
 	});
-	el.appendChild(jokerGroup);
 
-	// Encart séparé pour la carte symbole (APNG XOXO).
-	const symGroup = document.createElement("div");
-	symGroup.className = "symbol-group";
+	// Jeton symbole : SORTI de la main, posé à droite (cf. .symbol-token dans game.css).
 	symCardEl = document.createElement("div");
-	symCardEl.className = "card symbol";
+	symCardEl.className = "symbol-token";
 	const symImg = document.createElement("img");
 	symImg.className = "sym-art";
 	symImg.src = symbolAsset(mySymbol);
 	symImg.alt = mySymbol;
 	symCardEl.appendChild(symImg);
 	symCardEl.addEventListener("click", () => onSymbolSelect());
-	symGroup.appendChild(symCardEl);
-	el.appendChild(symGroup);
+	root.appendChild(symCardEl);
+
+	layoutFan();
+}
+
+// Éventail : transform par carte. Au survol, la carte survolée se redresse/lève au premier plan
+// et les voisines s'écartent (vers la gauche/droite selon leur côté) pour la lisibilité.
+function layoutFan() {
+	const n = handCards.length;
+	if (!n) return;
+	const center = (n - 1) / 2;
+	const ANGLE = 5, SPACING = 150, ARC = 18, PUSH = 80, LIFT = 70;
+	handCards.forEach((c, i) => {
+		const off = i - center;
+		if (i === hoverIndex) {
+			// garde sa position horizontale (pas de saut vers le centre) et se lève juste pour
+			// révéler toute la carte -> très peu de déplacement, donc pas de conflit avec le survol.
+			c.style.transform = `translateX(${(off * SPACING).toFixed(1)}px) translateY(${-LIFT}px) rotate(${(off * ANGLE * 0.5).toFixed(2)}deg) scale(1.05)`;
+			c.style.zIndex = "200"; // au-dessus de TOUTES les autres
+		} else {
+			const push = hoverIndex != null ? (i < hoverIndex ? -PUSH : PUSH) : 0;
+			const sel = (i === selectedJokerIndex) ? -34 : 0; // carte sélectionnée ressort
+			c.style.transform = `translateX(${(off * SPACING + push).toFixed(1)}px) translateY(${(Math.abs(off) * ARC + sel).toFixed(1)}px) rotate(${(off * ANGLE).toFixed(2)}deg)`;
+			c.style.zIndex = String(i === selectedJokerIndex ? 100 : 10 + i);
+		}
+	});
 }
 
 // Met à jour l'état des cartes existantes (sélection, consommation, IDLE/SELECTED).
@@ -349,12 +406,12 @@ function renderJokers() {
 
 	jokerEls.forEach((je, i) => {
 		const selected = i === selectedJokerIndex;
-		je.card.classList.toggle("selected", selected);   // grossissement + visuel SELECTED
 		je.card.classList.toggle("used", usedJokers[i]);   // fondu à l'opacité 0, incliquable
-		if (je.img && je.base) je.img.src = jokerAsset(je.base, selected);
+		if (je.img && je.base && i !== hoverIndex) je.img.src = jokerAsset(je.base, selected); // pas pendant le survol
 	});
 
 	if (symCardEl) symCardEl.classList.toggle("selected", symbolSelected);
+	layoutFan(); // applique positions + sélection + écartement courant
 }
 
 // Texte de guidage du sous-flux en cours.
@@ -640,6 +697,7 @@ function applyLocalTEMP(a) {
 			const nx = x + dx, ny = y + dy;
 			if (ny >= 0 && ny < board.length && nx >= 0 && nx < board[ny].length) board[ny][nx] = "";
 		}
+		playEffect("bomb", x, y);
 	} else if (card === "invert") {
 		if (x === 1) for (let i = 0; i < board[y].length; i++) board[y][i] = flip(board[y][i]);
 		else for (let j = 0; j < board.length; j++) board[j][y] = flip(board[j][y]);

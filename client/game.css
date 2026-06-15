@@ -43,7 +43,8 @@
 /* 4,2s = départ 2s + fondu grille 1,2s + 1s d'attente */
 #game.intro #players { animation: g-slide-left  1s cubic-bezier(0.34, 1.56, 0.64, 1) 4.2s both; }
 #game.intro #prompt  { animation: g-slide-right 1s cubic-bezier(0.34, 1.56, 0.64, 1) 4.2s both; }
-#game.intro #jokers  { animation: g-fade 4s ease 4.2s both; }
+#game.intro #jokers,
+#game.intro .symbol-token { animation: g-fade 4s ease 4.2s both; }
 #game.intro .statusbar,
 #game.intro .footer,
 #game.intro .rule { animation: g-fade 1s ease 4.2s both; }
@@ -61,21 +62,21 @@
 	align-items: center;
 	height: 36px;
 	padding: 0 48px;
-	background: #ECE8DD;
-	border-bottom: 1px solid #D7D1C2;
+	background: #1A1A1A;
+	border-bottom: 1px solid #333333;
 	font-size: 11px;
 }
-#game .statusbar .left  { color: #6B6657; }
-#game .statusbar .right { color: #141414; }
+#game .statusbar .left  { color: #8A8470; }
+#game .statusbar .right { color: #F24242; } /* IN GAME en rouge */
 
 /* --- Zone centrale --- */
 #game .wrap {
 	flex: 1;
 	display: flex;
 	flex-direction: column;
-	justify-content: center;
+	justify-content: flex-start; /* bloc principal vers le haut, dégagé de la main en bas */
 	align-items: center;
-	padding: 24px 40px;
+	padding: 28px 40px 0;
 }
 #game .col {
 	width: 680px;
@@ -95,8 +96,21 @@
 	height: 80px;
 }
 #game .chip { display: flex; align-items: center; gap: 12px; }
-#game .sym-icon { width: 64px; height: 64px; object-fit: contain; display: block; } /* symbole joueur (APNG XOXO) */
-#game .chip:not(.active) .sym-icon { opacity: 0.4; } /* atténué quand ce n'est pas son tour */
+
+/* l'encart entoure SEULEMENT le symbole : éteint par défaut, allumé (teinté) quand c'est son tour */
+#game .sym-icon {
+	width: 80px;
+	height: 80px;
+	padding: 8px;
+	box-sizing: border-box;
+	object-fit: contain;
+	display: block;
+	border-radius: 10px;
+	transition: background-color 0.35s ease, box-shadow 0.35s ease, opacity 0.35s ease;
+}
+#game .chip:not(.active) .sym-icon { opacity: 0.4; } /* atténué hors tour, sans encart */
+#game .chip.active.chip-x .sym-icon { background: rgba(242, 66, 66, 0.28); box-shadow: 0 0 18px rgba(242, 66, 66, 0.30); }  /* croix : rouge */
+#game .chip.active.chip-o .sym-icon { background: rgba(74, 222, 106, 0.26); box-shadow: 0 0 18px rgba(74, 222, 106, 0.30); } /* rond : vert */
 #game .pname { font-size: 13px; color: #FFFFFF; }
 #game .pname.dim { color: rgba(255, 255, 255, 0.55); }
 #game #turn { font-size: 13px; font-weight: 700; color: #FFFFFF; }
@@ -138,6 +152,10 @@
 	display: flex;
 	align-items: center;
 	gap: 6px;
+	position: relative;
+	z-index: 300;         /* au-dessus des cartes (sélectionnée z100 / survol z200) pour cliquer les flèches */
+	top: -24px;           /* remonté un peu */
+	pointer-events: none; /* ne bloque pas les cartes derrière... */
 }
 #game .arrow {
 	border: 1px solid #141414;
@@ -147,6 +165,7 @@
 	font-size: 13px;
 	padding: 4px 10px;
 	cursor: pointer;
+	pointer-events: auto; /* ...mais les flèches restent cliquables */
 }
 #game .arrow:hover { background: #141414; color: #F6F3EB; }
 
@@ -167,54 +186,59 @@
 #game .corner-bl { bottom: -14px; left: -14px; }
 #game .corner-br { bottom: -14px; right: -14px; }
 
-/* --- Cartes (encart jokers + encart symbole) --- */
-#game #jokers { display: flex; align-items: center; justify-content: center; gap: 28px; min-height: 240px; }
+/* --- Main de cartes : éventail ancré en bas-centre de l'écran --- */
+/* #jokers = point d'ancrage absolu ; les cartes (transform piloté par game.js) s'y empilent. */
+#game #jokers { position: absolute; left: 50%; bottom: -50px; width: 0; height: 0; z-index: 5; }
 
-/* Encart englobant les 4 jokers. */
-#game .joker-group {
+#game .card {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	width: 270px;                  /* légèrement réduit */
+	height: 405px;                 /* ratio 2:3 = aspect natif des APNG (500x750) */
+	margin-left: -135px;           /* centre la carte sur l'ancre */
+	transform-origin: center bottom;
+	transition: transform 0.2s ease, opacity 0.3s ease;
+	cursor: pointer;
+}
+#game .joker-art { width: 100%; height: 100%; object-fit: contain; display: block; }
+#game .card.joker.used { opacity: 0; pointer-events: none; } /* joué : fondu invisible + incliquable */
+
+/* --- Jeton symbole : hors de la main, à droite, bordure blanche légère --- */
+#game .symbol-token {
+	position: absolute;
+	right: 150px;
+	bottom: 100px;
+	width: 110px;
+	height: 110px;
+	border: 2px solid rgba(255, 255, 255, 0.7);
+	border-radius: 50%;
+	background: rgba(20, 20, 20, 0.35);
 	display: flex;
 	align-items: center;
-	gap: 12px;
-	padding: 16px;
-	border: 1px solid #141414;
+	justify-content: center;
+	cursor: pointer;
+	z-index: 6;
+	transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
-/* Encart séparé pour la carte symbole (bordure plus marquée pour bien distinguer). */
-#game .symbol-group {
-	display: flex;
-	align-items: center;
-	padding: 16px;
-	border: 2px solid #141414;
+#game .symbol-token .sym-art { width: 78%; height: 78%; object-fit: contain; display: block; }
+#game .symbol-token:hover { transform: scale(1.08); }
+/* sélectionné : la bordure pulse régulièrement (anneau qui s'étend et s'estompe) */
+#game .symbol-token.selected { border-color: #FFFFFF; animation: token-pulse 1.4s ease-in-out infinite; }
+@keyframes token-pulse {
+	0%   { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.55); }
+	70%  { box-shadow: 0 0 0 12px rgba(255, 255, 255, 0); }
+	100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
 }
 
-/* Carte joker = visuel APNG (IDLE par défaut, SELECTED au survol / quand choisi). */
-#game .card.joker {
-	padding: 0;
-	border: 0;
-	background: none;
-	cursor: pointer;
-	position: relative; /* requis pour le z-index */
-	z-index: 1;
-	transform-origin: center center;
-	transition: transform 0.18s ease, opacity 0.3s ease;
+/* --- Animations d'effet (bombe, etc.), centrées sur une case --- */
+#game .effect {
+	position: fixed;
+	transform: translate(-50%, -50%); /* centre l'image sur (left, top) = centre de la case */
+	height: auto;
+	z-index: 500; /* au-dessus du plateau, sous l'overlay de fin */
+	pointer-events: none;
 }
-#game .joker-art { width: 200px; height: 200px; object-fit: contain; display: block; }
-/* survol : la carte monte, grossit et passe au premier plan (effet "main de cartes") */
-#game .card.joker:hover { transform: translateY(-60px) scale(1.6); z-index: 50; }
-#game .card.joker.selected { transform: scale(1.25); z-index: 2; } /* sélectionné (clic) */
-#game .card.joker.used { opacity: 0; pointer-events: none; }       /* joué : fondu invisible + incliquable (reste en place) */
-
-/* Carte symbole = APNG XOXO. */
-#game .card.symbol {
-	padding: 0;
-	border: 0;
-	background: none;
-	cursor: pointer;
-	transform-origin: center center;
-	transition: transform 0.15s ease;
-}
-#game .sym-art { width: 200px; height: 200px; object-fit: contain; display: block; }
-#game .card.symbol:hover { transform: scale(1.08); }
-#game .card.symbol.selected { transform: scale(1.2); }
 
 /* --- Panneau debug (à retirer en prod) --- */
 #game #debug-panel {
@@ -260,13 +284,19 @@
 	letter-spacing: 4px;
 }
 
-/* --- Pied de page --- */
+/* --- Pied de page : épinglé aux coins bas de l'écran (SESSION à gauche, tictacdie à droite) --- */
 #game .footer {
-	width: 100%;
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
 	height: 36px;
+	padding: 0 24px;
+	box-sizing: border-box;
 	font-size: 10px;
 	color: #8A8470;
+	z-index: 4;
 }
