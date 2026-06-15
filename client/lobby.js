@@ -37,6 +37,19 @@ function teardown() {
 	root = null;
 }
 
+// Passage au jeu avec fondu : le jeu se construit derrière, puis le lobby (sombre)
+// se dissout en overlay plein écran pour révéler le jeu (clair) en dessous.
+function enterGame(startMsg) {
+	gameInit(ws, startMsg); // #game ajouté dans #app, derrière le lobby
+	if (!root) return;
+	const leaving = root;
+	root = null; // détache la référence : plus aucun render ne touchera ce lobby
+	leaving.classList.add("leaving");
+	// double rAF : laisse le navigateur peindre l'état initial avant de transitionner l'opacité
+	requestAnimationFrame(() => requestAnimationFrame(() => leaving.classList.add("fade-out")));
+	setTimeout(() => leaving.remove(), 2100); // nettoyage après la transition (cf. opacity 2s dans lobby.css)
+}
+
 // --- Réseau ---
 function onMessage(m) {
 	switch (m.type) {
@@ -62,9 +75,8 @@ function onMessage(m) {
 			break;
 
 		case "start":
-			// Handoff vers la vue de jeu : lobby disparaît, game prend le WS.
-			teardown();
-			gameInit(ws, m);
+			// Handoff vers la vue de jeu, avec fondu sombre → clair.
+			enterGame(m);
 			break;
 
 		case "closing":
@@ -257,8 +269,7 @@ function renderWaiting(col) {
 	const debug = el("button", { className: "debug", textContent: "⚙ lancer (solo debug)" });
 	debug.addEventListener("click", () => {
 		const name = sessionStorage.getItem("nickname") ?? "Joueur1";
-		teardown();
-		gameInit(ws, { type: "start", seed: 0, player1: name, player2: "Bot" });
+		enterGame({ type: "start", seed: 0, player1: name, player2: "Bot" });
 	});
 	sec.appendChild(debug);
 

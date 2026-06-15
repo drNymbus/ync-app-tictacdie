@@ -1,6 +1,8 @@
 /* game.css — vue de partie.
-   Reproduit la maquette Pencil "Game — Fullscreen" : direction CRT du lobby inversée
+   Reproduit la maquette Pencil "Game — Fullscreen" : direction du lobby inversée
    (fond papier clair, encre noire pour la grille / les boutons / les symboles).
+   Toutes les règles sont scopées sous #game pour ne pas entrer en collision avec lobby.css
+   (les deux feuilles sont chargées en même temps et partagent des noms de classes génériques).
    Note : grid-template-columns de #board reste piloté par game.js (la taille du board
    change au Resize). */
 
@@ -14,7 +16,7 @@
 }
 
 /* --- Barre de statut --- */
-.statusbar {
+#game .statusbar {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
@@ -24,11 +26,11 @@
 	border-bottom: 1px solid #D7D1C2;
 	font-size: 11px;
 }
-.statusbar .left  { color: #6B6657; }
-.statusbar .right { color: #141414; }
+#game .statusbar .left  { color: #6B6657; }
+#game .statusbar .right { color: #141414; }
 
 /* --- Zone centrale --- */
-.wrap {
+#game .wrap {
 	flex: 1;
 	display: flex;
 	flex-direction: column;
@@ -36,7 +38,7 @@
 	align-items: center;
 	padding: 24px 40px;
 }
-.col {
+#game .col {
 	width: 680px;
 	max-width: 100%;
 	display: flex;
@@ -46,15 +48,15 @@
 }
 
 /* --- Bandeau joueurs --- */
-#players {
+#game #players {
 	width: 100%;
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
 	height: 56px;
 }
-.chip { display: flex; align-items: center; gap: 10px; }
-.sym {
+#game .chip { display: flex; align-items: center; gap: 10px; }
+#game .sym {
 	width: 36px;
 	height: 36px;
 	display: flex;
@@ -64,24 +66,24 @@
 	font-size: 18px;
 	font-weight: 700;
 }
-.sym.active { background: #141414; color: #F6F3EB; } /* joueur dont c'est le tour */
-.pname { font-size: 13px; color: #141414; }
-.pname.dim { color: #6B6657; }
-#turn { font-size: 13px; font-weight: 700; color: #141414; }
+#game .sym.active { background: #141414; color: #F6F3EB; } /* joueur dont c'est le tour */
+#game .pname { font-size: 13px; color: #141414; }
+#game .pname.dim { color: #6B6657; }
+#game #turn { font-size: 13px; font-weight: 700; color: #141414; }
 
 /* --- Règles horizontales --- */
-.rule { width: 100%; height: 1px; background: #D7D1C2; }
+#game .rule { width: 100%; height: 1px; background: #D7D1C2; }
 
 /* --- Plateau --- */
-#board-wrap { width: 100%; display: flex; justify-content: center; padding: 18px 0; }
-#board {
+#game #board-wrap { width: 100%; display: flex; justify-content: center; padding: 18px 0; }
+#game #board {
 	display: grid;
 	gap: 3px;
 	background: #141414; /* l'écart laisse apparaître la grille noire */
 	padding: 3px;
 	position: relative; /* ancrage des coins de resize */
 }
-.cell {
+#game .cell {
 	width: 96px;
 	height: 96px;
 	background: #F6F3EB;
@@ -93,10 +95,10 @@
 	color: #141414;
 	cursor: pointer;
 }
-.cell.selected { box-shadow: inset 0 0 0 3px #141414; } /* surbrillance d'un sous-flux */
+#game .cell.selected { box-shadow: inset 0 0 0 3px #141414; } /* surbrillance d'un sous-flux */
 
 /* --- Prompt + flèches de direction (nomad) --- */
-#prompt {
+#game #prompt {
 	font-size: 11px;
 	color: #8A8470;
 	min-height: 16px;
@@ -104,7 +106,7 @@
 	align-items: center;
 	gap: 6px;
 }
-.arrow {
+#game .arrow {
 	border: 1px solid #141414;
 	background: #F6F3EB;
 	color: #141414;
@@ -113,10 +115,10 @@
 	padding: 4px 10px;
 	cursor: pointer;
 }
-.arrow:hover { background: #141414; color: #F6F3EB; }
+#game .arrow:hover { background: #141414; color: #F6F3EB; }
 
 /* --- Coins de resize : par-dessus le plateau --- */
-.corner {
+#game .corner {
 	position: absolute;
 	z-index: 10;
 	border: 1px solid #141414;
@@ -127,14 +129,14 @@
 	padding: 2px 6px;
 	cursor: pointer;
 }
-.corner-tl { top: -14px;    left: -14px; }
-.corner-tr { top: -14px;    right: -14px; }
-.corner-bl { bottom: -14px; left: -14px; }
-.corner-br { bottom: -14px; right: -14px; }
+#game .corner-tl { top: -14px;    left: -14px; }
+#game .corner-tr { top: -14px;    right: -14px; }
+#game .corner-bl { bottom: -14px; left: -14px; }
+#game .corner-br { bottom: -14px; right: -14px; }
 
 /* --- Cartes (4 jokers + symbole) --- */
-#jokers { display: flex; align-items: center; justify-content: center; gap: 10px; }
-.card {
+#game #jokers { display: flex; align-items: center; justify-content: center; gap: 10px; }
+#game .card {
 	padding: 12px 18px;
 	border: 1px solid #141414;
 	background: #F6F3EB;
@@ -144,12 +146,12 @@
 	text-transform: uppercase;
 	cursor: pointer;
 }
-.card.selected { background: #141414; color: #F6F3EB; }
-.card.used { opacity: 0.3; text-decoration: line-through; cursor: not-allowed; }
-.card.symbol { margin-left: 20px; border-width: 2px; font-weight: 700; } /* "soit un joker, soit ton symbole" */
+#game .card.selected { background: #141414; color: #F6F3EB; }
+#game .card.used { opacity: 0.3; text-decoration: line-through; cursor: not-allowed; }
+#game .card.symbol { margin-left: 20px; border-width: 2px; font-weight: 700; } /* "soit un joker, soit ton symbole" */
 
 /* --- Pied de page --- */
-.footer {
+#game .footer {
 	width: 100%;
 	display: flex;
 	justify-content: space-between;
