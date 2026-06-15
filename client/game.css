@@ -10,9 +10,26 @@
 	min-height: 100vh;
 	display: flex;
 	flex-direction: column;
-	background: #F6F3EB;
+	background: #F6F3EB; /* fallback le temps que la vidéo charge */
 	color: #141414;
 	font-family: "Space Mono", monospace;
+	position: relative; /* ancrage de la vidéo de fond */
+}
+
+/* --- Vidéo de fond (loop infini) --- */
+#game .bg-video {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	z-index: 0;
+}
+/* contenu au-dessus de la vidéo */
+#game > .statusbar,
+#game > .wrap {
+	position: relative;
+	z-index: 1;
 }
 
 /* --- Barre de statut --- */
@@ -56,20 +73,11 @@
 	height: 56px;
 }
 #game .chip { display: flex; align-items: center; gap: 10px; }
-#game .sym {
-	width: 36px;
-	height: 36px;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	border: 1px solid #141414;
-	font-size: 18px;
-	font-weight: 700;
-}
-#game .sym.active { background: #141414; color: #F6F3EB; } /* joueur dont c'est le tour */
-#game .pname { font-size: 13px; color: #141414; }
-#game .pname.dim { color: #6B6657; }
-#game #turn { font-size: 13px; font-weight: 700; color: #141414; }
+#game .sym-icon { width: 42px; height: 42px; object-fit: contain; display: block; } /* symbole joueur (APNG XOXO) */
+#game .chip:not(.active) .sym-icon { opacity: 0.4; } /* atténué quand ce n'est pas son tour */
+#game .pname { font-size: 13px; color: #FFFFFF; }
+#game .pname.dim { color: rgba(255, 255, 255, 0.55); }
+#game #turn { font-size: 13px; font-weight: 700; color: #FFFFFF; }
 
 /* --- Règles horizontales --- */
 #game .rule { width: 100%; height: 1px; background: #D7D1C2; }
@@ -86,7 +94,7 @@
 #game .cell {
 	width: 96px;
 	height: 96px;
-	background: #F6F3EB;
+	background: #E5DFCF; /* blanc cassé légèrement plus sombre */
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -94,8 +102,11 @@
 	font-weight: 700;
 	color: #141414;
 	cursor: pointer;
+	overflow: hidden; /* borne le symbole agrandi à sa case (pas de débordement sur les voisines) */
 }
 #game .cell.selected { box-shadow: inset 0 0 0 3px #141414; } /* surbrillance d'un sous-flux */
+/* symbole posé (APNG XOXO) : occupe un peu plus que la case */
+#game .cell-sym { width: 100%; height: 100%; object-fit: contain; display: block; transform: scale(1.15); }
 
 /* --- Prompt + flèches de direction (nomad) --- */
 #game #prompt {
@@ -134,21 +145,54 @@
 #game .corner-bl { bottom: -14px; left: -14px; }
 #game .corner-br { bottom: -14px; right: -14px; }
 
-/* --- Cartes (4 jokers + symbole) --- */
-#game #jokers { display: flex; align-items: center; justify-content: center; gap: 10px; }
-#game .card {
-	padding: 12px 18px;
+/* --- Cartes (encart jokers + encart symbole) --- */
+#game #jokers { display: flex; align-items: center; justify-content: center; gap: 28px; min-height: 240px; }
+
+/* Encart englobant les 4 jokers. */
+#game .joker-group {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 16px;
 	border: 1px solid #141414;
-	background: #F6F3EB;
-	color: #141414;
-	font-family: inherit;
-	font-size: 12px;
-	text-transform: uppercase;
-	cursor: pointer;
 }
-#game .card.selected { background: #141414; color: #F6F3EB; }
-#game .card.used { opacity: 0.3; text-decoration: line-through; cursor: not-allowed; }
-#game .card.symbol { margin-left: 20px; border-width: 2px; font-weight: 700; } /* "soit un joker, soit ton symbole" */
+/* Encart séparé pour la carte symbole (bordure plus marquée pour bien distinguer). */
+#game .symbol-group {
+	display: flex;
+	align-items: center;
+	padding: 16px;
+	border: 2px solid #141414;
+}
+
+/* Carte joker = visuel APNG (IDLE par défaut, SELECTED au survol / quand choisi). */
+#game .card.joker {
+	padding: 0;
+	border: 0;
+	background: none;
+	cursor: pointer;
+	position: relative; /* requis pour le z-index */
+	z-index: 1;
+	transform-origin: center center;
+	transition: transform 0.18s ease, opacity 0.3s ease;
+}
+#game .joker-art { width: 200px; height: 200px; object-fit: contain; display: block; }
+/* survol : la carte monte, grossit et passe au premier plan (effet "main de cartes") */
+#game .card.joker:hover { transform: translateY(-60px) scale(1.6); z-index: 50; }
+#game .card.joker.selected { transform: scale(1.25); z-index: 2; } /* sélectionné (clic) */
+#game .card.joker.used { opacity: 0; pointer-events: none; }       /* joué : fondu invisible + incliquable (reste en place) */
+
+/* Carte symbole = APNG XOXO. */
+#game .card.symbol {
+	padding: 0;
+	border: 0;
+	background: none;
+	cursor: pointer;
+	transform-origin: center center;
+	transition: transform 0.15s ease;
+}
+#game .sym-art { width: 200px; height: 200px; object-fit: contain; display: block; }
+#game .card.symbol:hover { transform: scale(1.08); }
+#game .card.symbol.selected { transform: scale(1.2); }
 
 /* --- Pied de page --- */
 #game .footer {

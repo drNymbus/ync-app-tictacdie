@@ -21,6 +21,8 @@ let myJokers = [];             // 4 jokers tirés via la seed
 let usedJokers = [];           // parallèle à myJokers : true = joker déjà consommé (usage unique)
 let pendingJokerIndex = null;  // index du joker consommé en optimiste (rollback sur ko)
 let selectedJokerIndex = null; // index du joker sélectionné dans myJokers
+let jokerEls = [];             // cartes jokers persistantes [{card, img, base}] (pour animer hover/select/fade)
+let symCardEl = null;          // carte symbole persistante (5e)
 let symbolSelected = false;    // true si la 5e carte (pose de symbole) est sélectionnée
 let flow = null;               // état du sous-flux multi-étapes en cours
 let pendingAction = null;      // dernière action envoyée (pour rollback éventuel sur ko)
@@ -32,6 +34,20 @@ let root = null;          // racine DOM de la vue game
 // Repasser à false pour le tirage normal par seed. (à retirer en prod)
 const DEBUG_ALL_JOKERS = true;
 const ALL_JOKERS = ["invert", "resize", "bomb", "nomad", "immunity", "trap", "virus"];
+
+// Correspondance joker -> base du nom de fichier APNG (client/assets/<BASE>_{IDLE,SELECTED}.png).
+const JOKER_ART = {
+	invert: "INVERT", resize: "SCALE", bomb: "BOMBOCLAAT", nomad: "NOMADE",
+	immunity: "IMMUNITE", trap: "PIEGE", virus: "VIRUS",
+	// ttt -> "BAGAR" (pas encore actif)
+};
+function jokerAsset(base, selected) {
+	return `/assets/${base}_${selected ? "SELECTED" : "IDLE"}.png`;
+}
+// Asset APNG d'un symbole posé (X / O).
+function symbolAsset(sym) {
+	return `/assets/XOXO_${sym}.png`;
+}
 
 // --- Dérivation seed (réplique exacte de shared/random.ts + Game.constructor) ---
 function seededRng(seed) {
@@ -99,9 +115,14 @@ export function teardown() {
 // --- Construction du layout (une seule fois) ---
 // Structure thème CRT (cf. game.css / maquette "Game — Fullscreen").
 function buildLayout() {
+	jokerEls = [];      // réinitialise les cartes persistantes (nouvelle partie)
+	symCardEl = null;
 	root = document.createElement("div");
 	root.id = "game";
 	root.innerHTML = `
+		<video class="bg-video" autoplay loop muted playsinline>
+			<source src="/assets/BACKGROUND_TILEABLE_CARD.mp4" type="video/mp4">
+		</video>
 		<div class="statusbar">
 			<span class="left">TICTACDIE.EXE  [v1.0]</span>
 			<span class="right">● IN GAME</span>
@@ -151,13 +172,13 @@ function renderPlayers() {
 	wrap.appendChild(chip(oppName, oppSymbol, live && !myTurn, true));
 }
 
-// Pastille joueur : carré symbole + nom. mirror = nom à gauche du symbole (adversaire).
+// Pastille joueur : symbole (APNG XOXO) + nom. mirror = nom à gauche du symbole (adversaire).
 function chip(name, sym, active, mirror) {
-	const c = el("div", { className: "chip" });
-	const box = el("div", { className: active ? "sym active" : "sym", textContent: sym });
+	const c = el("div", { className: active ? "chip active" : "chip" });
+	const icon = el("img", { className: "sym-icon", src: symbolAsset(sym), alt: sym });
 	const nm = el("span", { className: active ? "pname" : "pname dim", textContent: name || "—" });
-	if (mirror) c.append(nm, box);
-	else c.append(box, nm);
+	if (mirror) c.append(nm, icon);
+	else c.append(icon, nm);
 	return c;
 }
 
@@ -182,54 +203,103 @@ function renderBoard() {
 			cellEl.className = cellIsSelected(x, y) ? "cell selected" : "cell";
 			cellEl.dataset.x = x;
 			cellEl.dataset.y = y;
-			cellEl.textContent = renderCell(board[y][x]);
+			fillCell(cellEl, board[y][x]);
 			cellEl.addEventListener("click", () => onCellClick(x, y));
 			el.appendChild(cellEl);
 		}
 	}
 }
 
-// Mappe un Cell vers son visuel. Narrowing via la propriété `kind` (cf. shared/tictacdie.ts).
-function renderCell(cell) {
-	if (cell === "") return "";
-	if (cell === "X" || cell === "O") return cell;
+// Remplit une case. Les symboles (X/O, y compris nomad/virus en cours) s'affichent
+// via les APNG XOXO ; les jokers gardent un glyphe ; trap reste invisible.
+function fillCell(cellEl, cell) {
+	cellEl.textContent = "";
+	if (cell === "X" || cell === "O") { putSymbol(cellEl, cell); return; }
+	if (typeof cell !== "object" || !cell) return; // "" vide
 	switch (cell.kind) {
-		case "nomad":    return cell.content;        // affiche le symbole en transit
-		case "immunity": return "🛡";
-		case "virus":    return cell.content || "☣"; // neutre si pas de majorité
-		case "trap":     return "";                  // invisible pour tous
-		case "ttt":      return "?";
-		default:         return "";
+		case "nomad": // symbole en transit
+			if (cell.content === "X" || cell.content === "O") putSymbol(cellEl, cell.content);
+			return;
+		case "virus":
+			if (cell.content === "X" || cell.content === "O") putSymbol(cellEl, cell.content);
+			else cellEl.textContent = "☣"; // neutre
+			return;
+		case "immunity": cellEl.textContent = "🛡"; return;
+		case "ttt":      cellEl.textContent = "?"; return;
+		case "trap":     return; // invisible pour tous
 	}
 }
 
-function renderJokers() {
-	const el = root.querySelector("#jokers");
-	el.innerHTML = "";
-
-	// 4 jokers — un joker consommé est grisé et non cliquable (usage unique).
-	myJokers.forEach((j, i) => {
-		const card = makeCard(j, i === selectedJokerIndex);
-		if (usedJokers[i]) {
-			card.classList.add("used");
-		} else {
-			card.addEventListener("click", () => onJokerSelect(i));
-		}
-		el.appendChild(card);
-	});
-
-	// 5e carte : pose de symbole, légèrement décalée — "soit un joker, soit ton symbole".
-	const symCard = makeCard(mySymbol, symbolSelected);
-	symCard.classList.add("symbol");
-	symCard.addEventListener("click", () => onSymbolSelect());
-	el.appendChild(symCard);
+function putSymbol(cellEl, sym) {
+	const img = document.createElement("img");
+	img.className = "cell-sym";
+	img.src = symbolAsset(sym);
+	img.alt = sym;
+	cellEl.appendChild(img);
 }
 
-function makeCard(label, selected) {
-	const card = document.createElement("div");
-	card.className = selected ? "card selected" : "card";
-	card.textContent = label;
-	return card;
+// Construit les cartes UNE fois (éléments persistants → les anims hover/select/fade marchent).
+function buildJokers() {
+	const el = root.querySelector("#jokers");
+	el.innerHTML = "";
+	jokerEls = [];
+
+	// Encart regroupant les 4 jokers.
+	const jokerGroup = document.createElement("div");
+	jokerGroup.className = "joker-group";
+	myJokers.forEach((j, i) => {
+		const card = document.createElement("div");
+		card.className = "card joker";
+		const base = JOKER_ART[j];
+		let img = null;
+		if (base) {
+			img = document.createElement("img");
+			img.className = "joker-art";
+			img.alt = j;
+			card.appendChild(img);
+		} else {
+			card.classList.add("text"); // fallback joker sans visuel (ex: ttt)
+			card.textContent = j;
+		}
+		// Listener attaché une fois ; onJokerSelect ignore déjà les jokers consommés.
+		card.addEventListener("click", () => onJokerSelect(i));
+		// Survol : joue l'anim SELECTED (revient à IDLE en sortant, sauf si la carte est sélectionnée).
+		if (img) {
+			card.addEventListener("mouseenter", () => { if (!usedJokers[i]) img.src = jokerAsset(base, true); });
+			card.addEventListener("mouseleave", () => { if (!usedJokers[i]) img.src = jokerAsset(base, i === selectedJokerIndex); });
+		}
+		jokerGroup.appendChild(card);
+		jokerEls.push({ card, img, base });
+	});
+	el.appendChild(jokerGroup);
+
+	// Encart séparé pour la carte symbole (APNG XOXO).
+	const symGroup = document.createElement("div");
+	symGroup.className = "symbol-group";
+	symCardEl = document.createElement("div");
+	symCardEl.className = "card symbol";
+	const symImg = document.createElement("img");
+	symImg.className = "sym-art";
+	symImg.src = symbolAsset(mySymbol);
+	symImg.alt = mySymbol;
+	symCardEl.appendChild(symImg);
+	symCardEl.addEventListener("click", () => onSymbolSelect());
+	symGroup.appendChild(symCardEl);
+	el.appendChild(symGroup);
+}
+
+// Met à jour l'état des cartes existantes (sélection, consommation, IDLE/SELECTED).
+function renderJokers() {
+	if (!jokerEls.length) buildJokers();
+
+	jokerEls.forEach((je, i) => {
+		const selected = i === selectedJokerIndex;
+		je.card.classList.toggle("selected", selected);   // grossissement + visuel SELECTED
+		je.card.classList.toggle("used", usedJokers[i]);   // fondu à l'opacité 0, incliquable
+		if (je.img && je.base) je.img.src = jokerAsset(je.base, selected);
+	});
+
+	if (symCardEl) symCardEl.classList.toggle("selected", symbolSelected);
 }
 
 // Texte de guidage du sous-flux en cours.

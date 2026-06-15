@@ -37,3 +37,12 @@ Domaine : **serveur** (Victor) · **front** (Alexis) · **partagé**
 - **Observé** : on peut poser une immunity sur un symbole adverse. `placeImmunity` ne vérifie pas à qui appartient le symbole de la case.
 - **À trancher avec Victor** : est-ce voulu ? Si l'immunity ne doit protéger que ses propres symboles, ajouter la vérification côté serveur.
 - **Statut** : question de règle, à discuter
+
+---
+
+## 🟠 #4 — Poser un virus sur un trap ne déclenche pas la redirection
+
+- **Domaine** : serveur — `shared/tictacdie.ts`, `placeVirus()` (et autres poses de jokers)
+- **Observé** : poser un virus sur une case piégée n'est pas redirigé — le virus écrase simplement le trap. Seul `placeSymbol` gère la redirection des pièges ; les poses de jokers (virus, immunity, nomad…) l'ignorent.
+- **À trancher avec Victor** : un joker posé sur un trap doit-il être redirigé comme un symbole, ou écraser/ignorer le piège ? (les règles de CLAUDE.md ne décrivent la redirection que pour les symboles)
+- **Statut** : question de règle / comportement, à discuter

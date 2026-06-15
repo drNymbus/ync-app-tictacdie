@@ -24,6 +24,20 @@ const server = createServer((req, res) => {
 	} else if (url.pathname === "/lobby.css") {
 		res.setHeader("content-type", "text/css");
 		res.end(page("lobby.css"));
+	} else if (url.pathname.startsWith("/assets/")) {
+		try {
+			const name = url.pathname.slice("/assets/".length);
+			// lecture binaire (pas d'encodage utf8) pour les APNG / vidéos
+			const data = readFileSync(join("client", "assets", name));
+			const ct = name.endsWith(".mp4") ? "video/mp4"
+				: name.endsWith(".png") ? "image/png"
+				: "application/octet-stream";
+			res.setHeader("content-type", ct);
+			res.end(data);
+		} catch {
+			res.statusCode = 404;
+			res.end();
+		}
 	} else {
 		res.statusCode = 404;
 		res.end(page("error.html"));
