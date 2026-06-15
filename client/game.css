@@ -10,7 +10,7 @@
 	min-height: 100vh;
 	display: flex;
 	flex-direction: column;
-	background: #F6F3EB; /* fallback le temps que la vidéo charge */
+	background: #000000; /* noir derrière la vidéo (qui est à 50% d'opacité) */
 	color: #141414;
 	font-family: "Space Mono", monospace;
 	position: relative; /* ancrage de la vidéo de fond */
@@ -23,8 +23,30 @@
 	width: 100%;
 	height: 100%;
 	object-fit: cover;
+	opacity: 0.25;
 	z-index: 0;
 }
+
+/* Fondu de sortie du jeu vers le lobby (cf. fondu lobby -> game). */
+#game.leaving { position: fixed; inset: 0; z-index: 2000; transition: opacity 2s ease; }
+#game.leaving.fade-out { opacity: 0; }
+
+/* --- Chorégraphie d'entrée (#game.intro, retirée par game.js une fois finie) ---
+   1) la grille apparaît en fondu ; 2) 1s après, les bandeaux arrivent des côtés
+   (easing avec léger rebond) pendant que les cartes apparaissent en fondu. */
+@keyframes g-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes g-slide-left  { from { opacity: 0; transform: translateX(-130%); } to { opacity: 1; transform: translateX(0); } }
+@keyframes g-slide-right { from { opacity: 0; transform: translateX(130%); }  to { opacity: 1; transform: translateX(0); } }
+
+/* départ décalé à 2s (après le fondu lobby -> game) */
+#game.intro #board-wrap { animation: g-fade 3s ease 1s both; }
+/* 4,2s = départ 2s + fondu grille 1,2s + 1s d'attente */
+#game.intro #players { animation: g-slide-left  1s cubic-bezier(0.34, 1.56, 0.64, 1) 4.2s both; }
+#game.intro #prompt  { animation: g-slide-right 1s cubic-bezier(0.34, 1.56, 0.64, 1) 4.2s both; }
+#game.intro #jokers  { animation: g-fade 4s ease 4.2s both; }
+#game.intro .statusbar,
+#game.intro .footer,
+#game.intro .rule { animation: g-fade 1s ease 4.2s both; }
 /* contenu au-dessus de la vidéo */
 #game > .statusbar,
 #game > .wrap {
@@ -70,10 +92,10 @@
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	height: 56px;
+	height: 80px;
 }
-#game .chip { display: flex; align-items: center; gap: 10px; }
-#game .sym-icon { width: 42px; height: 42px; object-fit: contain; display: block; } /* symbole joueur (APNG XOXO) */
+#game .chip { display: flex; align-items: center; gap: 12px; }
+#game .sym-icon { width: 64px; height: 64px; object-fit: contain; display: block; } /* symbole joueur (APNG XOXO) */
 #game .chip:not(.active) .sym-icon { opacity: 0.4; } /* atténué quand ce n'est pas son tour */
 #game .pname { font-size: 13px; color: #FFFFFF; }
 #game .pname.dim { color: rgba(255, 255, 255, 0.55); }
@@ -193,6 +215,50 @@
 #game .sym-art { width: 200px; height: 200px; object-fit: contain; display: block; }
 #game .card.symbol:hover { transform: scale(1.08); }
 #game .card.symbol.selected { transform: scale(1.2); }
+
+/* --- Panneau debug (à retirer en prod) --- */
+#game #debug-panel {
+	position: fixed;
+	top: 44px;
+	right: 12px;
+	z-index: 1100; /* au-dessus de l'overlay de fin pour pouvoir basculer/fermer */
+	display: flex;
+	gap: 6px;
+}
+#game .debug-btn {
+	font-family: "Space Mono", monospace;
+	font-size: 11px;
+	padding: 6px 10px;
+	background: rgba(0, 0, 0, 0.6);
+	color: #FFFFFF;
+	border: 1px solid #FFFFFF;
+	cursor: pointer;
+}
+
+/* --- Overlay de fin (VICTOIRE / DEFAITE) --- */
+#game #gameover {
+	position: fixed;
+	inset: 0;
+	z-index: 1000;
+	background: rgba(8, 10, 8, 0.85); /* couche opaque qui assombrit tout l'écran */
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+#game .go-art {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover; /* écrans de fin conçus en plein écran */
+}
+#game .go-text {
+	color: #FFFFFF;
+	font-family: "Space Mono", monospace;
+	font-size: 64px;
+	font-weight: 700;
+	letter-spacing: 4px;
+}
 
 /* --- Pied de page --- */
 #game .footer {

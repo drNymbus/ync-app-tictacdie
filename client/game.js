@@ -27,6 +27,11 @@ let symbolSelected = false;    // true si la 5e carte (pose de symbole) est sél
 let flow = null;               // état du sous-flux multi-étapes en cours
 let pendingAction = null;      // dernière action envoyée (pour rollback éventuel sur ko)
 let gameOverResult = null;     // null tant que la partie n'est pas finie ; 0/1/2 ensuite
+let soloDebug = false;         // true si lancé via le bouton solo debug (pas de serveur, garde la main)
+let onExit = null;             // callback fourni par le lobby pour le reconstruire à la fin
+let gameOverTimer = null;      // timer du fondu de fin -> lobby
+
+const END_ANIM_MS = 6000;      // durée des APNG VICTOIRE/DEFAITE (mesurée)
 
 let root = null;          // racine DOM de la vue game
 
@@ -82,10 +87,12 @@ function deriveFromSeed(seed, isPlayer1) {
 }
 
 // --- Cycle de vie ---
-export function init(socket, startMsg) {
+export function init(socket, startMsg, exitCb) {
 	ws = socket;
+	onExit = exitCb || null;
 
 	// Identité : matching pseudo <-> player1/player2 (cf. protocol.ts)
+	soloDebug = startMsg.debug === true;
 	myName = sessionStorage.getItem("nickname") ?? "";
 	myIndex = (myName === startMsg.player1) ? 1 : 2;
 	oppName = (myIndex === 1) ? startMsg.player2 : startMsg.player1;
@@ -93,7 +100,7 @@ export function init(socket, startMsg) {
 	const derived = deriveFromSeed(startMsg.seed, myIndex === 1);
 	mySymbol = derived.symbol;
 	oppSymbol = mySymbol === "X" ? "O" : "X";
-	myTurn = derived.myTurn;
+	myTurn = soloDebug ? true : derived.myTurn; // en solo debug on garde la main pour tester
 	myJokers = DEBUG_ALL_JOKERS ? [...ALL_JOKERS] : derived.jokers;
 	usedJokers = myJokers.map(() => false); // aucun joker consommé au départ
 
@@ -119,9 +126,10 @@ function buildLayout() {
 	symCardEl = null;
 	root = document.createElement("div");
 	root.id = "game";
+	root.classList.add("intro"); // chorégraphie d'entrée (cf. game.css)
 	root.innerHTML = `
 		<video class="bg-video" autoplay loop muted playsinline>
-			<source src="/assets/BACKGROUND_TILEABLE_CARD.mp4" type="video/mp4">
+			<source src="/assets/BACKGROUND_TILEABLE_CARD_SIZE.mp4" type="video/mp4">
 		</video>
 		<div class="statusbar">
 			<span class="left">TICTACDIE.EXE  [v1.0]</span>
@@ -143,6 +151,32 @@ function buildLayout() {
 		</div>
 	`;
 	document.getElementById("app").appendChild(root);
+
+	// L'autoplay n'est pas fiable sur une <video> insérée via innerHTML : on force la lecture.
+	const bg = root.querySelector(".bg-video");
+	if (bg) bg.play().catch(() => {});
+
+	// Retire la classe d'intro une fois toutes les animations terminées (cartes : 4,2s + 4s).
+	setTimeout(() => { if (root) root.classList.remove("intro"); }, 8500);
+
+	if (DEBUG_ALL_JOKERS) buildDebugPanel();
+}
+
+// DEBUG : panneau pour prévisualiser les écrans de fin (à retirer en prod).
+function buildDebugPanel() {
+	const panel = el("div", { id: "debug-panel" });
+	const mk = (label, fn) => {
+		const b = el("button", { className: "debug-btn", textContent: label });
+		b.addEventListener("click", fn);
+		return b;
+	};
+	panel.append(
+		mk("Victoire", () => showGameOver(myIndex)),
+		mk("Défaite", () => showGameOver(myIndex === 1 ? 2 : 1)),
+		mk("Nul", () => showGameOver(0)),
+		mk("Fermer", () => { clearTimeout(gameOverTimer); gameOverResult = null; if (root) renderAll(); }),
+	);
+	root.appendChild(panel);
 }
 
 // Petit helper DOM.
@@ -160,6 +194,27 @@ function renderAll() {
 	renderJokers();
 	renderPrompt();
 	renderFlowControls();
+	renderGameOver();
+}
+
+// Overlay de fin : assombrit tout l'écran et affiche l'APNG VICTOIRE / DEFAITE au centre.
+function renderGameOver() {
+	const existing = root.querySelector("#gameover");
+	if (existing) existing.remove();
+	if (gameOverResult === null) return;
+
+	const overlay = el("div", { id: "gameover" });
+	if (gameOverResult === 0) {
+		overlay.appendChild(el("div", { className: "go-text", textContent: "MATCH NUL" }));
+	} else {
+		const win = gameOverResult === myIndex;
+		overlay.appendChild(el("img", {
+			className: "go-art",
+			src: `/assets/${win ? "VICTOIRE" : "DEFAITE"}.png`,
+			alt: win ? "Victoire" : "Défaite",
+		}));
+	}
+	root.appendChild(overlay);
 }
 
 function renderPlayers() {
@@ -501,7 +556,7 @@ function sendAction(action) {
 		usedJokers[selectedJokerIndex] = true;
 	}
 
-	if (ws) {
+	if (ws && !soloDebug) {
 		// Le serveur n'accuse pas le succès (pas de "ok" en jeu) : on applique en optimiste.
 		// En cas de refus, le "ko" renvoie le board pour resync (cf. onServerMessage).
 		ws.send(JSON.stringify(action));
@@ -509,8 +564,7 @@ function sendAction(action) {
 		localTick();
 		setTurn(false);
 	} else {
-		// Bootstrap local (pas de serveur) : applique et garde la main pour tester l'UI.
-		console.log("ACTION ->", action);
+		// Solo debug / bootstrap local : applique localement et garde la main pour tester l'UI.
 		applyLocalTEMP(action);
 		localTick();
 	}
@@ -645,4 +699,18 @@ function showGameOver(result) {
 	myTurn = false;
 	resetSelection(); // coupe toute interaction en cours
 	renderAll();
+	// Quand l'animation de fin se termine (ou après un délai pour le match nul) : fondu -> lobby.
+	clearTimeout(gameOverTimer);
+	gameOverTimer = setTimeout(exitToLobby, result === 0 ? 2500 : END_ANIM_MS);
+}
+
+// Fondu plein écran du jeu, révélant le lobby reconstruit derrière (miroir du fondu lobby -> game).
+function exitToLobby() {
+	if (!root) return;
+	if (onExit) onExit(); // reconstruit le lobby derrière le jeu
+	const leaving = root;
+	root = null;
+	leaving.classList.add("leaving");
+	requestAnimationFrame(() => requestAnimationFrame(() => leaving.classList.add("fade-out")));
+	setTimeout(() => leaving.remove(), 2100);
 }

@@ -40,7 +40,8 @@ function teardown() {
 // Passage au jeu avec fondu : le jeu se construit derrière, puis le lobby (sombre)
 // se dissout en overlay plein écran pour révéler le jeu (clair) en dessous.
 function enterGame(startMsg) {
-	gameInit(ws, startMsg); // #game ajouté dans #app, derrière le lobby
+	// 3e arg : callback de retour au lobby (à la fin de partie, game reconstruit le lobby).
+	gameInit(ws, startMsg, () => init(ws)); // #game ajouté dans #app, derrière le lobby
 	if (!root) return;
 	const leaving = root;
 	root = null; // détache la référence : plus aucun render ne touchera ce lobby
@@ -269,7 +270,7 @@ function renderWaiting(col) {
 	const debug = el("button", { className: "debug", textContent: "⚙ lancer (solo debug)" });
 	debug.addEventListener("click", () => {
 		const name = sessionStorage.getItem("nickname") ?? "Joueur1";
-		enterGame({ type: "start", seed: 0, player1: name, player2: "Bot" });
+		enterGame({ type: "start", seed: 0, player1: name, player2: "Bot", debug: true });
 	});
 	sec.appendChild(debug);
 
