@@ -1,5 +1,5 @@
-/* lobby.css — vue lobby, thème "CRT Terminal".
-   Reproduit la maquette Pencil "Lobby — CRT Fullscreen".
+/* lobby.css — vue lobby.
+   Reproduit la maquette Pencil "Lobby — Fullscreen".
    Palette : fond #0A0E0A, vert vif #4ADE6A, verts atténués pour le texte secondaire. */
 
 html, body { margin: 0; padding: 0; }
@@ -15,7 +15,7 @@ html, body { margin: 0; padding: 0; }
 }
 
 /* --- Barre de statut --- */
-.crt-statusbar {
+.statusbar {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
@@ -25,18 +25,18 @@ html, body { margin: 0; padding: 0; }
 	border-bottom: 1px solid #1C4A2A;
 	font-size: 11px;
 }
-.crt-statusbar .left  { color: #5C8A66; }
-.crt-statusbar .right { color: #4ADE6A; }
+.statusbar .left  { color: #5C8A66; }
+.statusbar .right { color: #4ADE6A; }
 
 /* --- Zone centrale --- */
-.crt-wrap {
+.wrap {
 	flex: 1;
 	display: flex;
 	justify-content: center;
 	align-items: flex-start;
 	padding: 0 40px;
 }
-.crt-col {
+.col {
 	width: 920px;
 	max-width: 100%;
 	display: flex;
@@ -44,7 +44,7 @@ html, body { margin: 0; padding: 0; }
 }
 
 /* --- Titre --- */
-.crt-title {
+.title {
 	color: #4ADE6A;
 	font-size: 64px;
 	font-weight: 700;
@@ -53,10 +53,10 @@ html, body { margin: 0; padding: 0; }
 }
 
 /* --- Règles horizontales --- */
-.crt-rule { height: 1px; background: #1C4A2A; border: 0; margin: 0; }
+.rule { height: 1px; background: #1C4A2A; border: 0; margin: 0; }
 
 /* --- Sections --- */
-.crt-section {
+.section {
 	display: flex;
 	flex-direction: column;
 	gap: 14px;
@@ -64,7 +64,7 @@ html, body { margin: 0; padding: 0; }
 }
 
 /* --- Champs de saisie --- */
-.crt-input {
+.input {
 	height: 48px;
 	background: #0A0E0A;
 	border: 1px solid #1C4A2A;
@@ -74,11 +74,11 @@ html, body { margin: 0; padding: 0; }
 	font-size: 12px;
 	box-sizing: border-box;
 }
-.crt-input:focus { outline: none; border-color: #4ADE6A; }
-.crt-input::placeholder { color: #3E6646; }
+.input:focus { outline: none; border-color: #4ADE6A; }
+.input::placeholder { color: #3E6646; }
 
 /* --- Boutons --- */
-.crt-btn-primary {
+.btn-primary {
 	height: 56px;
 	background: #4ADE6A;
 	color: #06140A;
@@ -89,9 +89,9 @@ html, body { margin: 0; padding: 0; }
 	letter-spacing: 1px;
 	cursor: pointer;
 }
-.crt-btn-primary:hover { background: #6BE986; }
+.btn-primary:hover { background: #6BE986; }
 
-.crt-btn-outline {
+.btn-outline {
 	height: 48px;
 	background: #0C120C;
 	border: 1px solid #4ADE6A;
@@ -101,30 +101,30 @@ html, body { margin: 0; padding: 0; }
 	cursor: pointer;
 	padding: 0 18px;
 }
-.crt-btn-outline:hover { background: #122012; }
+.btn-outline:hover { background: #122012; }
 
-.crt-join-row { display: flex; gap: 10px; }
-.crt-join-row .crt-input { flex: 1; }
-.crt-join-row .crt-btn-outline { width: 140px; padding: 0; }
+.join-row { display: flex; gap: 10px; }
+.join-row .input { flex: 1; }
+.join-row .btn-outline { width: 140px; padding: 0; }
 
 /* --- Métadonnées / commentaires --- */
-.crt-meta    { color: #7AAC84; font-size: 12px; }
-.crt-comment { color: #3E6646; font-size: 11px; }
-.crt-error   { color: #E0564E; font-size: 12px; }
+.meta    { color: #7AAC84; font-size: 12px; }
+.comment { color: #3E6646; font-size: 11px; }
+.error   { color: #E0564E; font-size: 12px; }
 
 /* --- Liste des parties --- */
-.crt-games { display: flex; flex-direction: column; }
-.crt-game-row {
+.games { display: flex; flex-direction: column; }
+.game-row {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
 	height: 46px;
 	border-bottom: 1px solid #152915;
 }
-.crt-game-row .info { display: flex; align-items: center; gap: 12px; }
-.crt-game-row .gid   { color: #3E6646; font-size: 12px; }
-.crt-game-row .gname { color: #9FE0AC; font-size: 13px; }
-.crt-join-small {
+.game-row .info { display: flex; align-items: center; gap: 12px; }
+.game-row .gid   { color: #3E6646; font-size: 12px; }
+.game-row .gname { color: #9FE0AC; font-size: 13px; }
+.join-small {
 	background: transparent;
 	border: 1px solid #1C4A2A;
 	color: #4ADE6A;
@@ -133,10 +133,10 @@ html, body { margin: 0; padding: 0; }
 	padding: 6px 14px;
 	cursor: pointer;
 }
-.crt-join-small:hover { border-color: #4ADE6A; }
+.join-small:hover { border-color: #4ADE6A; }
 
 /* --- Pied de page --- */
-.crt-footer {
+.footer {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
@@ -146,7 +146,7 @@ html, body { margin: 0; padding: 0; }
 }
 
 /* --- Bouton debug (à retirer en prod) --- */
-.crt-debug {
+.debug {
 	margin-top: 8px;
 	background: transparent;
 	border: 1px dashed #3E6646;
@@ -159,4 +159,4 @@ html, body { margin: 0; padding: 0; }
 }
 
 /* --- Rangée de boutons (salle d'attente) --- */
-.crt-btn-row { display: flex; gap: 10px; }
+.btn-row { display: flex; gap: 10px; }

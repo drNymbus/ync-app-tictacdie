@@ -97,18 +97,38 @@ export function teardown() {
 }
 
 // --- Construction du layout (une seule fois) ---
+// Structure thème CRT (cf. game.css / maquette "Game — Fullscreen").
 function buildLayout() {
 	root = document.createElement("div");
 	root.id = "game";
 	root.innerHTML = `
-		<div id="players"></div>
-		<div id="turn"></div>
-		<div id="prompt"></div>
-		<div id="board"></div>
-		<div id="jokers"></div>
+		<div class="statusbar">
+			<span class="left">TICTACDIE.EXE  [v1.0]</span>
+			<span class="right">● IN GAME</span>
+		</div>
+		<div class="wrap">
+			<div class="col">
+				<div id="players"></div>
+				<div class="rule"></div>
+				<div id="board-wrap"><div id="board"></div></div>
+				<div id="prompt"></div>
+				<div class="rule"></div>
+				<div id="jokers"></div>
+				<div class="footer">
+					<span>SESSION: #8F2A91</span>
+					<span>tictacdie // alpha</span>
+				</div>
+			</div>
+		</div>
 	`;
-	// mise en forme dans game.css
 	document.getElementById("app").appendChild(root);
+}
+
+// Petit helper DOM.
+function el(tag, props = {}) {
+	const e = document.createElement(tag);
+	Object.assign(e, props);
+	return e;
 }
 
 // --- Rendu ---
@@ -122,11 +142,23 @@ function renderAll() {
 }
 
 function renderPlayers() {
-	const el = root.querySelector("#players");
-	el.innerHTML = `
-		<span class="me">${myName} (${mySymbol})</span>
-		<span class="opp">${oppName} (${oppSymbol})</span>
-	`;
+	const wrap = root.querySelector("#players");
+	wrap.innerHTML = "";
+	const live = gameOverResult === null;
+	// Le joueur dont c'est le tour a son symbole en surbrillance.
+	wrap.appendChild(chip(myName, mySymbol, live && myTurn, false));
+	wrap.appendChild(el("div", { id: "turn" }));
+	wrap.appendChild(chip(oppName, oppSymbol, live && !myTurn, true));
+}
+
+// Pastille joueur : carré symbole + nom. mirror = nom à gauche du symbole (adversaire).
+function chip(name, sym, active, mirror) {
+	const c = el("div", { className: "chip" });
+	const box = el("div", { className: active ? "sym active" : "sym", textContent: sym });
+	const nm = el("span", { className: active ? "pname" : "pname dim", textContent: name || "—" });
+	if (mirror) c.append(nm, box);
+	else c.append(box, nm);
+	return c;
 }
 
 function renderTurn() {
@@ -143,7 +175,7 @@ function renderBoard() {
 	const el = root.querySelector("#board");
 	el.innerHTML = "";
 	const n = board.length;
-	el.style.gridTemplateColumns = `repeat(${n}, 48px)`;
+	el.style.gridTemplateColumns = `repeat(${n}, 96px)`;
 	for (let y = 0; y < n; y++) {
 		for (let x = 0; x < board[y].length; x++) {
 			const cellEl = document.createElement("div");
@@ -204,7 +236,10 @@ function makeCard(label, selected) {
 function renderPrompt() {
 	const p = root.querySelector("#prompt");
 	p.innerHTML = "";
-	if (!flow) return;
+	if (!flow) {
+		if (gameOverResult === null && myTurn) p.textContent = "# choisis une carte, puis une case";
+		return;
+	}
 	// switch : évite d'évaluer flow.cells.length quand le joker n'est pas invert.
 	let msg = "";
 	switch (flow.card) {
