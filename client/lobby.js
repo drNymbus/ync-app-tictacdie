@@ -126,72 +126,143 @@ function onLeave() {
 	send({ type: "leave" });
 }
 
-// --- Rendu (mise en forme minimale TEMP, à reprendre avec la maquette Pencil) ---
+// --- Rendu (thème CRT Terminal, cf. lobby.css / maquette Pencil) ---
 function render(errorMsg) {
 	root.innerHTML = "";
-	if (view === "signin") renderSignin();
-	else if (view === "browse") renderBrowse();
-	else if (view === "waiting") renderWaiting();
-	if (errorMsg) {
-		const err = document.createElement("div");
-		err.textContent = "⚠ " + errorMsg;
-		err.style.color = "#c33";
-		root.appendChild(err);
-	}
+
+	// Coquille commune : barre de statut + colonne centrée + pied de page.
+	root.appendChild(statusBar());
+	const wrap = el("div", { className: "crt-wrap" });
+	const col = el("div", { className: "crt-col" });
+	wrap.appendChild(col);
+	root.appendChild(wrap);
+
+	col.append(el("div", { className: "crt-title", textContent: "TIC_TAC_DIE" }), rule());
+
+	if (view === "signin") renderSignin(col);
+	else if (view === "browse") renderBrowse(col);
+	else if (view === "waiting") renderWaiting(col);
+
+	if (errorMsg) col.appendChild(el("div", { className: "crt-error", textContent: "// " + errorMsg }));
+
+	col.append(rule(), footer());
 }
 
-function renderSignin() {
-	const input = el("input", { placeholder: "Ton pseudo" });
-	const btn = el("button", { textContent: "Valider" });
-	btn.addEventListener("click", () => onSignin(input.value.trim()));
-	root.append(h2("Connexion"), input, btn);
-}
-
-function renderBrowse() {
-	root.append(h2("Salons"));
-
-	// Liste des salons disponibles
-	if (lobbies.length === 0) {
-		root.append(el("div", { textContent: "Aucun salon. Crée le tien." }));
-	}
-	lobbies.forEach((l) => {
-		const line = el("div");
-		line.textContent = `${l.id} (${l.players.join(", ") || "vide"}) `;
-		const join = el("button", { textContent: "Rejoindre" });
-		join.addEventListener("click", () => onJoin(l.id));
-		line.appendChild(join);
-		root.appendChild(line);
-	});
-
-	// Création
-	const idInput = el("input", { placeholder: "Nom du salon" });
-	const create = el("button", { textContent: "Créer" });
-	create.addEventListener("click", () => onCreate(idInput.value.trim()));
-
-	root.append(el("hr"), h2("Créer un salon"), idInput, create);
-}
-
-function renderWaiting() {
-	root.append(
-		h2("Salle d'attente"),
-		el("div", { textContent: `Salon : ${currentLobby}` }),
-		el("div", { textContent: myReady ? "Prêt — en attente de l'adversaire…" : "Clique sur Prêt quand tu es prêt." }),
+function statusBar() {
+	const bar = el("div", { className: "crt-statusbar" });
+	bar.append(
+		el("span", { className: "left", textContent: "TICTACDIE.EXE  [v1.0]" }),
+		el("span", { className: "right", textContent: "● ONLINE" }),
 	);
-	const ready = el("button", { textContent: myReady ? "Annuler prêt" : "Prêt" });
+	return bar;
+}
+
+function footer() {
+	const f = el("div", { className: "crt-footer" });
+	f.append(
+		el("span", { textContent: "SESSION: #8F2A91  ·  PING: 24ms" }),
+		el("span", { textContent: "tictacdie // alpha" }),
+	);
+	return f;
+}
+
+function rule() {
+	return el("div", { className: "crt-rule" });
+}
+
+// signin : connexion par pseudo.
+function renderSignin(col) {
+	const sec = section();
+	sec.appendChild(el("div", { className: "crt-comment", textContent: "guest@arcade:~$ identifiez-vous_" }));
+
+	const input = el("input", { className: "crt-input", placeholder: "Votre pseudo" });
+	const submit = () => onSignin(input.value.trim());
+	input.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
+
+	const btn = el("button", { className: "crt-btn-primary", textContent: "> SE CONNECTER" });
+	btn.addEventListener("click", submit);
+
+	sec.append(input, btn);
+	col.appendChild(sec);
+}
+
+// browse : créer une partie + rejoindre + liste des parties.
+function renderBrowse(col) {
+	// Création (input nom du salon + gros bouton vert)
+	const createSec = section();
+	const nameInput = el("input", { className: "crt-input", placeholder: "Nom du salon" });
+	const createBtn = el("button", { className: "crt-btn-primary", textContent: "> CRÉER UNE PARTIE" });
+	createBtn.addEventListener("click", () => onCreate(nameInput.value.trim()));
+	createSec.append(nameInput, createBtn);
+	col.append(createSec, rule());
+
+	// Rejoindre par ID
+	const joinSec = section();
+	const joinRow = el("div", { className: "crt-join-row" });
+	const idInput = el("input", { className: "crt-input", placeholder: "Enter Game ID" });
+	const joinBtn = el("button", { className: "crt-btn-outline", textContent: "rejoindre" });
+	joinBtn.addEventListener("click", () => onJoin(idInput.value.trim()));
+	joinRow.append(idInput, joinBtn);
+	joinSec.appendChild(joinRow);
+	col.append(joinSec, rule());
+
+	// Liste des parties en attente
+	const listSec = section();
+	listSec.appendChild(el("div", { className: "crt-meta", textContent: `PARTIES EN ATTENTE: ${lobbies.length}` }));
+	listSec.appendChild(el("div", { className: "crt-comment", textContent: "# cliquez pour rejoindre" }));
+
+	const games = el("div", { className: "crt-games" });
+	if (lobbies.length === 0) {
+		games.appendChild(el("div", { className: "crt-comment", textContent: "// aucune partie — créez la vôtre" }));
+	}
+	lobbies.forEach((l) => games.appendChild(gameRow(l)));
+	listSec.appendChild(games);
+	col.appendChild(listSec);
+}
+
+function gameRow(l) {
+	const row = el("div", { className: "crt-game-row" });
+	const info = el("div", { className: "info" });
+	info.append(
+		el("span", { className: "gid", textContent: `[${l.id}]` }),
+		el("span", { className: "gname", textContent: l.players.join(", ") || "en attente" }),
+	);
+	const join = el("button", { className: "crt-join-small", textContent: "[ join ]" });
+	join.addEventListener("click", () => onJoin(l.id));
+	row.append(info, join);
+	return row;
+}
+
+// waiting : salle d'attente avant le start.
+function renderWaiting(col) {
+	const sec = section();
+	sec.append(
+		el("div", { className: "crt-comment", textContent: "# salle d'attente" }),
+		el("div", { className: "crt-meta", textContent: `SALON: ${currentLobby}` }),
+		el("div", {
+			className: "crt-meta",
+			textContent: myReady ? "● PRÊT — en attente de l'adversaire…" : "○ en attente de votre confirmation",
+		}),
+	);
+
+	const btnRow = el("div", { className: "crt-btn-row" });
+	const ready = el("button", { className: "crt-btn-outline", textContent: myReady ? "annuler" : "prêt" });
 	ready.addEventListener("click", () => onReady());
-	const leave = el("button", { textContent: "Quitter" });
+	const leave = el("button", { className: "crt-btn-outline", textContent: "quitter" });
 	leave.addEventListener("click", () => onLeave());
-	root.append(ready, leave);
+	btnRow.append(ready, leave);
+	sec.appendChild(btnRow);
 
 	// DEBUG : lance la vue jeu sans adversaire (à retirer en prod)
-	const debug = el("button", { textContent: "⚙ Lancer (solo debug)" });
-	debug.style.cssText = "margin-left:24px;opacity:0.5;font-size:0.85em";
+	const debug = el("button", { className: "crt-debug", textContent: "⚙ lancer (solo debug)" });
 	debug.addEventListener("click", () => {
 		const name = sessionStorage.getItem("nickname") ?? "Joueur1";
 		teardown();
 		gameInit(ws, { type: "start", seed: 0, player1: name, player2: "Bot" });
 	});
-	root.append(debug);
+	sec.appendChild(debug);
+
+	col.appendChild(sec);
 }
 
 // --- Petits helpers DOM ---
@@ -200,6 +271,6 @@ function el(tag, props = {}) {
 	Object.assign(e, props);
 	return e;
 }
-function h2(text) {
-	return el("h2", { textContent: text });
+function section() {
+	return el("div", { className: "crt-section" });
 }

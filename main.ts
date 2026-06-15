@@ -21,6 +21,9 @@ const server = createServer((req, res) => {
 	} else if (url.pathname === "/game.css") {
 		res.setHeader("content-type", "text/css");
 		res.end(page("game.css"));
+	} else if (url.pathname === "/lobby.css") {
+		res.setHeader("content-type", "text/css");
+		res.end(page("lobby.css"));
 	} else {
 		res.statusCode = 404;
 		res.end(page("error.html"));

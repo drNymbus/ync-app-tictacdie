@@ -1,0 +1,162 @@
+/* lobby.css — vue lobby, thème "CRT Terminal".
+   Reproduit la maquette Pencil "Lobby — CRT Fullscreen".
+   Palette : fond #0A0E0A, vert vif #4ADE6A, verts atténués pour le texte secondaire. */
+
+html, body { margin: 0; padding: 0; }
+
+/* --- Racine plein écran --- */
+#lobby {
+	min-height: 100vh;
+	display: flex;
+	flex-direction: column;
+	background: #0A0E0A;
+	color: #9FE0AC;
+	font-family: "Space Mono", monospace;
+}
+
+/* --- Barre de statut --- */
+.crt-statusbar {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	height: 36px;
+	padding: 0 48px;
+	background: #111711;
+	border-bottom: 1px solid #1C4A2A;
+	font-size: 11px;
+}
+.crt-statusbar .left  { color: #5C8A66; }
+.crt-statusbar .right { color: #4ADE6A; }
+
+/* --- Zone centrale --- */
+.crt-wrap {
+	flex: 1;
+	display: flex;
+	justify-content: center;
+	align-items: flex-start;
+	padding: 0 40px;
+}
+.crt-col {
+	width: 920px;
+	max-width: 100%;
+	display: flex;
+	flex-direction: column;
+}
+
+/* --- Titre --- */
+.crt-title {
+	color: #4ADE6A;
+	font-size: 64px;
+	font-weight: 700;
+	letter-spacing: 2px;
+	padding: 44px 0 24px;
+}
+
+/* --- Règles horizontales --- */
+.crt-rule { height: 1px; background: #1C4A2A; border: 0; margin: 0; }
+
+/* --- Sections --- */
+.crt-section {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	padding: 20px 0;
+}
+
+/* --- Champs de saisie --- */
+.crt-input {
+	height: 48px;
+	background: #0A0E0A;
+	border: 1px solid #1C4A2A;
+	color: #9FE0AC;
+	padding: 0 14px;
+	font-family: inherit;
+	font-size: 12px;
+	box-sizing: border-box;
+}
+.crt-input:focus { outline: none; border-color: #4ADE6A; }
+.crt-input::placeholder { color: #3E6646; }
+
+/* --- Boutons --- */
+.crt-btn-primary {
+	height: 56px;
+	background: #4ADE6A;
+	color: #06140A;
+	border: 0;
+	font-family: inherit;
+	font-size: 14px;
+	font-weight: 700;
+	letter-spacing: 1px;
+	cursor: pointer;
+}
+.crt-btn-primary:hover { background: #6BE986; }
+
+.crt-btn-outline {
+	height: 48px;
+	background: #0C120C;
+	border: 1px solid #4ADE6A;
+	color: #4ADE6A;
+	font-family: inherit;
+	font-size: 12px;
+	cursor: pointer;
+	padding: 0 18px;
+}
+.crt-btn-outline:hover { background: #122012; }
+
+.crt-join-row { display: flex; gap: 10px; }
+.crt-join-row .crt-input { flex: 1; }
+.crt-join-row .crt-btn-outline { width: 140px; padding: 0; }
+
+/* --- Métadonnées / commentaires --- */
+.crt-meta    { color: #7AAC84; font-size: 12px; }
+.crt-comment { color: #3E6646; font-size: 11px; }
+.crt-error   { color: #E0564E; font-size: 12px; }
+
+/* --- Liste des parties --- */
+.crt-games { display: flex; flex-direction: column; }
+.crt-game-row {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	height: 46px;
+	border-bottom: 1px solid #152915;
+}
+.crt-game-row .info { display: flex; align-items: center; gap: 12px; }
+.crt-game-row .gid   { color: #3E6646; font-size: 12px; }
+.crt-game-row .gname { color: #9FE0AC; font-size: 13px; }
+.crt-join-small {
+	background: transparent;
+	border: 1px solid #1C4A2A;
+	color: #4ADE6A;
+	font-family: inherit;
+	font-size: 10px;
+	padding: 6px 14px;
+	cursor: pointer;
+}
+.crt-join-small:hover { border-color: #4ADE6A; }
+
+/* --- Pied de page --- */
+.crt-footer {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	height: 44px;
+	color: #3E6646;
+	font-size: 10px;
+}
+
+/* --- Bouton debug (à retirer en prod) --- */
+.crt-debug {
+	margin-top: 8px;
+	background: transparent;
+	border: 1px dashed #3E6646;
+	color: #5C8A66;
+	font-family: inherit;
+	font-size: 11px;
+	padding: 8px 12px;
+	cursor: pointer;
+	opacity: 0.7;
+}
+
+/* --- Rangée de boutons (salle d'attente) --- */
+.crt-btn-row { display: flex; gap: 10px; }
