@@ -138,7 +138,10 @@ export class Game {
 	}; // isGameOver
 
 	action(player_index: number, card: string, x: number, y:number, opt1: number, opt2: number, opt3: string): [boolean, string] {
-		if (player_index !== 1 - this.turn%2) return [false, "not your turn"]; // not your turn
+		if (player_index !== 1 - this.turn%2) return [false, "Not your turn"]; // not your turn
+
+		if (player_index === 0 && !this.p1.jokers.include(card)) return [false, "You do not possess this joker"];
+		if (player_index === 1 && !this.p2.jokers.include(card)) return [false, "You do not possess this joker"];
 
 		let res = false;
 		let message = "";
@@ -171,7 +174,11 @@ export class Game {
 			[res, message] = this.placeTTT(0, 0);
 		}
 
-		this.tick();
+		if (res) {
+			this.tick();
+			if (player_index === 0) this.p1.jokers.splice(this.p1.jokers.indexOf(card));
+			if (player_index === 1) this.p2.jokers.splice(this.p1.jokers.indexOf(card));
+		}
 		return [res, message];
 	} // action
 
