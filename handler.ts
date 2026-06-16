@@ -235,9 +235,9 @@ export function action(ws: WebSocket, action: msg.ClientGameMessage) {
 	} as msg.ClientGameMessage
 
 	if (action.player === 1) {
-		game.player2.send(action_msg);
+		game.player2.send(JSON.stringify(action_msg));
 	} else if (action.player === 2) {
-		game.player1.send(action_msg);
+		game.player1.send(JSON.stringify(action_msg));
 	}
 
 	const over = game.game.isGameOver();
@@ -269,7 +269,11 @@ export function error(ws: WebSocket, msg: string) {
 		if (!player) return close(ws);
 		const game = GAMES.get(player.game);
 		if (!game) return close(ws);
-		return ws.send(JSON.stringify({type: "ko", message: msg, board: game.game.board} as msg.ServerGameMessage));
+		return ws.send(JSON.stringify({
+			type: "ko", message: msg,
+			board: game.game.board, turn: game.game.turn,
+			p1: game.game.p1, p2: game.game.p2
+		} as msg.ServerGameMessage));
 	}
 } // error
 
