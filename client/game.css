@@ -240,6 +240,41 @@
 	pointer-events: none;
 }
 
+/* Symbole en train d'être soufflé par la bombe : maintenu plein puis fondu + zoom/flou,
+   calé sur la durée de l'anim de bombe (2240 ms, cf. EFFECTS.bomb dans game.js). */
+#game .sym-fade {
+	position: fixed;
+	object-fit: contain;
+	z-index: 480; /* au-dessus du plateau, sous l'explosion (500) qui l'engloutit */
+	pointer-events: none;
+	animation: bomb-sym-fade 2240ms ease-out forwards;
+}
+@keyframes bomb-sym-fade {
+	0%   { opacity: 1; transform: translate(-50%, -50%) scale(1.15); filter: blur(0); }
+	35%  { opacity: 1; transform: translate(-50%, -50%) scale(1.15); filter: blur(0); }
+	75%  { opacity: 0; transform: translate(-50%, -50%) scale(1.6);  filter: blur(7px); }
+	100% { opacity: 0; transform: translate(-50%, -50%) scale(1.6);  filter: blur(7px); }
+}
+
+/* Sortie de l'immunité : grossit légèrement au centre, puis se contracte jusqu'à disparaître. */
+#game .effect.immunity-out {
+	animation: immunity-out 520ms cubic-bezier(0.5, 0, 0.7, 1) forwards;
+}
+@keyframes immunity-out {
+	0%   { transform: translate(-50%, -50%) scale(1);    opacity: 1; }
+	30%  { transform: translate(-50%, -50%) scale(1.18); opacity: 1; }
+	100% { transform: translate(-50%, -50%) scale(0);    opacity: 0; }
+}
+
+/* APNG de transition Invert (O→X / X→O), posé sur la case, calé sur la taille du symbole. */
+#game .sym-transi {
+	position: fixed;
+	transform: translate(-50%, -50%) scale(1.15); /* même cadrage que .cell-sym */
+	object-fit: contain;
+	z-index: 490; /* au-dessus du plateau, sous les anims d'effet (bombe 500) */
+	pointer-events: none;
+}
+
 /* --- Panneau debug (à retirer en prod) --- */
 #game #debug-panel {
 	position: fixed;

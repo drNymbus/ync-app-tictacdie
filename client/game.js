@@ -59,8 +59,15 @@ function symbolAsset(sym) {
 // Animations d'effet jouées une fois, centrées sur la case ciblée { base, ms (durée mesurée), size px }.
 const EFFECTS = {
 	bomb: { base: "BOMBOCLAAT_ANIM", ms: 2240, size: 300 },
-	// immunity: { base: "IMMUNITE_ANIM", ... }, virus: { base: "VIRUS_ANIM", ... } — à venir
+	virus: { base: "VIRUS_ANIM", ms: 1500, size: 180 },     // ms/size à ajuster sur le rendu réel
+	immunity: { base: "IMMUNITE_ANIM", ms: 1500, size: 200 }, // ms/size à ajuster sur le rendu réel
 };
+
+// Transition jouée sur une case lors d'un Invert : APNG du symbole qui mute (O→X / X→O).
+// L'anim morphe par-dessus la case ; le symbole réel dessous est masqué le temps de l'anim.
+const TRANSI = { o_to_x: "TRANSI_O_to_X", x_to_o: "TRANSI_X_to_O", ms: 1000 }; // ms à ajuster
+// Cases dont le symbole est masqué pendant une transition Invert ("x,y").
+const transitioning = new Set();
 
 // Joue l'animation d'effet d'une carte, centrée sur le centre de la case (x, y), puis la retire.
 function playEffect(card, x, y) {
@@ -78,6 +85,92 @@ function playEffect(card, x, y) {
 		img.style.width = fx.size + "px";
 		root.appendChild(img);
 		setTimeout(() => img.remove(), fx.ms); // retiré après une lecture (l'APNG boucle sinon)
+	});
+}
+
+// Fait disparaître en fondu les symboles détruits par la bombe, calé sur la durée de l'anim.
+// cells = [{ x, y, sym }] mémorisés avant le vidage du board (cf. applyLocalTEMP "bomb").
+function fadeOutSymbols(cells) {
+	if (!cells || !cells.length) return;
+	// rAF : attend le re-rendu du board (cases désormais vides) pour lire leur position réelle.
+	requestAnimationFrame(() => {
+		if (!root) return;
+		for (const { x, y, sym } of cells) {
+			const cell = root.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`);
+			if (!cell) continue;
+			const r = cell.getBoundingClientRect();
+			const img = el("img", { className: "sym-fade", src: symbolAsset(sym), alt: "" });
+			img.style.left = (r.left + r.width / 2) + "px"; // centre du symbole = centre de la case
+			img.style.top = (r.top + r.height / 2) + "px";
+			img.style.width = r.width + "px";
+			img.style.height = r.height + "px";
+			root.appendChild(img);
+			setTimeout(() => img.remove(), EFFECTS.bomb.ms);
+		}
+	});
+}
+
+// Virus qui mute : joue l'anim virus sur la case, puis bascule le symbole affiché à mi-anim.
+// cell.content porte déjà la nouvelle valeur (logique) ; on diffère seulement le rendu.
+function morphVirus(cell, x, y) {
+	playEffect("virus", x, y);
+	setTimeout(() => {
+		cell.displayContent = cell.content;
+		if (root) renderAll();
+	}, EFFECTS.virus.ms / 2);
+}
+
+// Immunité : joue l'APNG sur la case et le GARDE figé sur sa dernière frame (num_plays patché à 1)
+// jusqu'à l'expiration du joker (2 tours). L'image est rattachée à la cellule pour être retirée
+// par localTick au moment où l'immunité retombe. (overlay flottant → survit aux re-rendus du board)
+function playImmunity(cell, x, y) {
+	const fx = EFFECTS.immunity;
+	requestAnimationFrame(() => {
+		if (!root) return;
+		const el2 = root.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`);
+		if (!el2) return;
+		const r = el2.getBoundingClientRect();
+		const img = el("img", { className: "effect", src: `/assets/${fx.base}.png?t=${Date.now()}`, alt: "" });
+		img.style.left = (r.left + r.width / 2) + "px";
+		img.style.top = (r.top + r.height / 2) + "px";
+		img.style.width = fx.size + "px";
+		root.appendChild(img);
+		cell._fx = img; // retiré à l'expiration (cf. localTick, branche immunity)
+	});
+}
+
+// Sortie de l'APNG immunité : léger grossissement au centre puis contraction jusqu'à disparition.
+function dismissImmunity(img) {
+	img.classList.add("immunity-out");
+	img.addEventListener("animationend", () => img.remove(), { once: true });
+}
+
+// Invert : pose l'APNG de transition sur chaque case inversée (O→X / X→O), masque le symbole
+// réel dessous le temps de l'anim, puis le révèle (déjà flippé dans le board) à la fin.
+// cells = [{ x, y, from }] capturés AVANT le flip (cf. applyLocalTEMP "invert").
+function playInvertTransitions(cells) {
+	if (!cells || !cells.length) return;
+	for (const { x, y } of cells) transitioning.add(`${x},${y}`); // masque dès le prochain rendu
+	// rAF : attend le re-rendu du board pour lire la position réelle des cases.
+	requestAnimationFrame(() => {
+		if (!root) return;
+		for (const { x, y, from } of cells) {
+			const cell = root.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`);
+			if (!cell) { transitioning.delete(`${x},${y}`); continue; }
+			const r = cell.getBoundingClientRect();
+			const base = from === "O" ? TRANSI.o_to_x : TRANSI.x_to_o; // O→X joue o_to_x, X→O joue x_to_o
+			const img = el("img", { className: "sym-transi", src: `/assets/${base}.png?t=${Date.now()}`, alt: "" });
+			img.style.left = (r.left + r.width / 2) + "px";
+			img.style.top = (r.top + r.height / 2) + "px";
+			img.style.width = r.width + "px";
+			img.style.height = r.height + "px";
+			root.appendChild(img);
+			setTimeout(() => {
+				img.remove();
+				transitioning.delete(`${x},${y}`);
+				if (root) renderAll(); // révèle le symbole flippé une fois l'anim terminée
+			}, TRANSI.ms);
+		}
 	});
 }
 
@@ -286,7 +379,7 @@ function renderBoard() {
 			cellEl.className = cellIsSelected(x, y) ? "cell selected" : "cell";
 			cellEl.dataset.x = x;
 			cellEl.dataset.y = y;
-			fillCell(cellEl, board[y][x]);
+			fillCell(cellEl, board[y][x], x, y);
 			cellEl.addEventListener("click", () => onCellClick(x, y));
 			el.appendChild(cellEl);
 		}
@@ -295,19 +388,28 @@ function renderBoard() {
 
 // Remplit une case. Les symboles (X/O, y compris nomad/virus en cours) s'affichent
 // via les APNG XOXO ; les jokers gardent un glyphe ; trap reste invisible.
-function fillCell(cellEl, cell) {
+function fillCell(cellEl, cell, x, y) {
 	cellEl.textContent = "";
-	if (cell === "X" || cell === "O") { putSymbol(cellEl, cell); return; }
+	if (cell === "X" || cell === "O") {
+		if (transitioning.has(`${x},${y}`)) return; // symbole masqué : l'APNG de transition joue par-dessus
+		putSymbol(cellEl, cell);
+		return;
+	}
 	if (typeof cell !== "object" || !cell) return; // "" vide
 	switch (cell.kind) {
 		case "nomad": // symbole en transit
 			if (cell.content === "X" || cell.content === "O") putSymbol(cellEl, cell.content);
 			return;
-		case "virus":
-			if (cell.content === "X" || cell.content === "O") putSymbol(cellEl, cell.content);
+		case "virus": {
+			// displayContent = symbole affiché (en retard sur content le temps de l'anim de mutation).
+			const shown = cell.displayContent !== undefined ? cell.displayContent : cell.content;
+			if (shown === "X" || shown === "O") putSymbol(cellEl, shown);
 			else cellEl.textContent = "☣"; // neutre
 			return;
-		case "immunity": cellEl.textContent = "🛡"; return;
+		}
+		case "immunity": // visuel = APNG figé (cf. playImmunity) ; on garde juste le symbole protégé dessous
+			if (cell.content === "X" || cell.content === "O") putSymbol(cellEl, cell.content);
+			return;
 		case "ttt":      cellEl.textContent = "?"; return;
 		case "trap":     return; // invisible pour tous
 	}
@@ -650,7 +752,10 @@ function localTick() {
 				}
 			} else if (cell.kind === "immunity") {
 				cell.cooldown--;
-				if (cell.cooldown < 0) board[j][i] = cell.content;
+				if (cell.cooldown < 0) {
+					if (cell._fx) dismissImmunity(cell._fx); // grossit puis se contracte pour disparaître
+					board[j][i] = cell.content;
+				}
 			} else if (cell.kind === "virus") {
 				let x = 0, o = 0;
 				for (const [dy, dx] of [[-1,0],[1,0],[-1,-1],[0,-1],[1,-1],[-1,1],[0,1],[1,1]]) {
@@ -660,7 +765,13 @@ function localTick() {
 						if (board[nj][ni] === "O") o++;
 					}
 				}
-				cell.content = x > o ? "X" : o > x ? "O" : "";
+				const next = x > o ? "X" : o > x ? "O" : "";
+				// Le contenu logique change tout de suite ; l'AFFICHAGE (displayContent) reste sur
+				// l'ancien symbole le temps de l'anim virus, puis bascule à la fin (cf. morphVirus).
+				if (next !== cell.content) {
+					cell.content = next;
+					morphVirus(cell, i, j);
+				}
 			}
 		}
 	}
@@ -687,20 +798,48 @@ function applyLocalTEMP(a) {
 		// Piège invisible au rendu mais stocké pour reproduire la redirection localement.
 		board[y][x] = { kind: "trap", newx: opt1, newy: opt2 };
 	} else if (card === "immunity") {
-		board[y][x] = { kind: "immunity", cooldown: 2, content: board[y][x] };
+		const cell = { kind: "immunity", cooldown: 2, content: board[y][x] };
+		board[y][x] = cell;
+		playImmunity(cell, x, y);
 	} else if (card === "virus") {
-		board[y][x] = { kind: "virus", content: "" };
+		board[y][x] = { kind: "virus", content: "", displayContent: "" };
 	} else if (card === "nomad") {
 		board[y][x] = { kind: "nomad", cooldown: 1, dirx: opt1, diry: opt2, content: opt3, old_content: board[y][x] };
 	} else if (card === "bomb") {
+		// On mémorise les symboles détruits AVANT de vider, pour les faire disparaître en fondu
+		// (le board re-rendu juste après les effacerait instantanément sinon).
+		const cleared = [];
 		for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
 			const nx = x + dx, ny = y + dy;
-			if (ny >= 0 && ny < board.length && nx >= 0 && nx < board[ny].length) board[ny][nx] = "";
+			if (ny >= 0 && ny < board.length && nx >= 0 && nx < board[ny].length) {
+				const c = board[ny][nx];
+				const sym = (c === "X" || c === "O") ? c
+					: (typeof c === "object" && c && (c.kind === "nomad" || c.kind === "virus")
+						&& (c.content === "X" || c.content === "O")) ? c.content
+					: null;
+				if (sym) cleared.push({ x: nx, y: ny, sym });
+				board[ny][nx] = "";
+			}
 		}
 		playEffect("bomb", x, y);
+		fadeOutSymbols(cleared);
 	} else if (card === "invert") {
-		if (x === 1) for (let i = 0; i < board[y].length; i++) board[y][i] = flip(board[y][i]);
-		else for (let j = 0; j < board.length; j++) board[j][y] = flip(board[j][y]);
+		// On note les symboles inversés (avec leur valeur d'origine) pour jouer l'anim de transition.
+		const swapped = [];
+		if (x === 1) {
+			for (let i = 0; i < board[y].length; i++) {
+				const c = board[y][i];
+				if (c === "X" || c === "O") swapped.push({ x: i, y, from: c });
+				board[y][i] = flip(c);
+			}
+		} else {
+			for (let j = 0; j < board.length; j++) {
+				const c = board[j][y];
+				if (c === "X" || c === "O") swapped.push({ x: y, y: j, from: c });
+				board[j][y] = flip(c);
+			}
+		}
+		playInvertTransitions(swapped);
 	} else if (card === "resize") {
 		const rowOff = x === 1 ? 1 : 0, colOff = opt1 === 1 ? 1 : 0;
 		const old = board, n = old.length;
