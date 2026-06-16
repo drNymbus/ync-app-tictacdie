@@ -30,12 +30,18 @@ function sendLobbies(ws: WebSocket) {
 			lobbies.push({id: lobby.id, players: player_names} as msg.LobbyView);
 		}
 	}
-	ws.send({type: "lobbies", lobbies: lobbies} as msg.ServerLobbyMessage);
+	ws.send(JSON.stringify({type: "lobbies", lobbies: lobbies} as msg.ServerLobbyMessage));
 } // sendLobbies
+
+function broadcastLobbies() {
+	for (const [ws, player] of PLAYERS) {
+		if (player.lobby === "") sendLobbies(ws);
+	}
+}
 
 export function getState(ws: WebSocket): string {
 	const player = PLAYERS.get(ws);
-	if (!player) { close(ws); return "close"; }
+	if (!player) { return "register"; }
 
 	if (player.lobby !== "" && player.ready && player.game !== -1) {
 		return "game";
@@ -66,7 +72,8 @@ export function create(ws: WebSocket, id: string) {
 		p.lobby = id;
 		PLAYERS.set(ws, p);
 
-		ws.send({type: "ok"} as msg.ServerLobbyMessage);
+		ws.send(JSON.stringify({type: "ok"} as msg.ServerLobbyMessage));
+		broadcastLobbies();
 	} catch (e) {
 		if (e instanceof Error) {
 			console.error(e.message);
@@ -94,7 +101,8 @@ export function join(ws: WebSocket, id: string) {
 		player.game = -1;
 		PLAYERS.set(ws, player);
 		
-		ws.send({type: "ok"} as msg.ServerLobbyMessage);
+		ws.send(JSON.stringify({type: "ok"} as msg.ServerLobbyMessage));
+		broadcastLobbies();
 	} catch (e) {
 		if (e instanceof Error) {
 			console.error(e.message);
@@ -129,17 +137,18 @@ function broadcastStart(id: string) {
 
 	for (const ws of lobby.players) {
 		const p = PLAYERS.get(ws);
-		if (!p) return close(ws);
-		if (player1 === "") {
-			player1 = p.name;
-		} else { player2 = p.name; }
+		if (!p) close(ws);
+		if (player1 === undefined) {
+			player1 = p?.name;
+		} else { player2 = p?.name; }
 	}
 
+	if (player1 === undefined || player2 === undefined) return;
 	try {
 		const gId = gameId++;
 		GAMES.set(gId, {
 			id: gId,
-			game: new ttd.Game(seed, {name: player1} as ttd.Player, {name: player2} as ttd.Player),
+			game: new ttd.Game(seed, player1, player2),
 			player1: lobby.players[0],
 			player2: lobby.players[1]
 		});
@@ -150,8 +159,9 @@ function broadcastStart(id: string) {
 			p.game = gId;
 			PLAYERS.set(ws, p);
 
-			ws.send({type: "start", seed: seed, player1: player1, player2: player2} as msg.ServerLobbyMessage);
+			ws.send(JSON.stringify({type: "start", seed: seed, player1: player1, player2: player2} as msg.ServerLobbyMessage));
 		}
+		broadcastLobbies();
 	} catch (e) {
 		if (e instanceof Error) {
 			console.error(e.message);
@@ -169,7 +179,7 @@ export function ready(ws: WebSocket) {
 		player.ready = !player.ready;
 		PLAYERS.set(ws, player);
 
-		ws.send({type: "ok"} as msg.ServerLobbyMessage);
+		ws.send(JSON.stringify({type: "ok"} as msg.ServerLobbyMessage));
 		if (isLobbyReady(player.lobby)) broadcastStart(player.lobby);
 	} catch (e) {
 		if (e instanceof Error) {
@@ -194,7 +204,7 @@ export function leave(ws: WebSocket) {
 		player.lobby = "";
 		player.ready = false;
 		PLAYERS.set(ws, player);
-		ws.send({type: "ok"} as msg.ServerLobbyMessage);
+		broadcastLobbies();
 	} catch (e) {
 		if (e instanceof Error) {
 			console.error(e.message);
@@ -214,6 +224,7 @@ export function action(ws: WebSocket, action: msg.ClientGameMessage) {
 
 	const [ok, err] = game.game.action(action.player-1, action.card, action.x, action.y, action.opt1, action.opt2, action.opt3);
 	if (!ok) return error(ws, err);
+	ws.send(JSON.stringify({type: "ok"}));
 
 	const action_msg = {
 		type: "action",
@@ -224,15 +235,15 @@ export function action(ws: WebSocket, action: msg.ClientGameMessage) {
 	} as msg.ClientGameMessage
 
 	if (action.player === 1) {
-		game.player2.send(action_msg);
+		game.player2.send(JSON.stringify(action_msg));
 	} else if (action.player === 2) {
-		game.player1.send(action_msg);
+		game.player1.send(JSON.stringify(action_msg));
 	}
 
 	const over = game.game.isGameOver();
 	const gameover_msg = {type: "gameover", result: over} as msg.ServerGameMessage;
-	game.player1.send(gameover_msg);
-	game.player2.send(gameover_msg);
+	game.player1.send(JSON.stringify(gameover_msg));
+	game.player2.send(JSON.stringify(gameover_msg));
 
 	if (over !== -1) {
 		const p1 = PLAYERS.get(game.player1);
@@ -250,25 +261,21 @@ export function action(ws: WebSocket, action: msg.ClientGameMessage) {
 } // action
 
 export function error(ws: WebSocket, msg: string) {
-	let player = PLAYERS.get(ws);
-	if (!player) return close(ws);
-
-	player.lobby = "";
-	player.ready = false;
-	player.game = -1;
-	PLAYERS.set(ws, player);
-
 	const state = getState(ws);
-	if (state === "lobby") {
-		return ws.send({type: "ko", message: msg} as msg.ServerLobbyMessage);
+	if (state === "lobby" || state === "register") {
+		return ws.send(JSON.stringify({type: "ko", message: msg} as msg.ServerLobbyMessage));
 	} else if (state === "game") {
+		let player = PLAYERS.get(ws);
+		if (!player) return close(ws);
 		const game = GAMES.get(player.game);
 		if (!game) return close(ws);
-		return ws.send({type: "ko", message: msg, board: game.game.board} as msg.ServerGameMessage);
+		return ws.send(JSON.stringify({type: "ko", message: msg, board: game.game.board} as msg.ServerGameMessage));
 	}
 } // error
 
 export function close(ws: WebSocket) {
-	ws.send({type: "closing"});
+	// PLAYERS.delete(ws);
+
+	ws.send(JSON.stringify({type: "closing"}));
 	ws.close();
 } // close

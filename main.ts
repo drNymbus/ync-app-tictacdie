@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { WebSocketServer } from "npm:ws";
+import { WebSocketServer, WebSocket } from "npm:ws";
 import * as msg from "./shared/protocol.ts";
 import * as handler from "./handler.ts";
 
@@ -12,8 +12,6 @@ const server = createServer((req, res) => {
 
 	if (url.pathname === "/") {
 		res.end(page("index.html"));
-	} else if (url.pathname === "/game") {
-		res.end(page("game.html"));
 	} else if (url.pathname === "/lobby.js") {
 		res.setHeader("content-type", "text/javascript");
 		res.end(page("lobby.js"));
@@ -28,17 +26,18 @@ const server = createServer((req, res) => {
 
 const wss = new WebSocketServer({ server });
 
-wss.on("connection", (ws) => {
-	ws.on("message", (raw) => {
+wss.on("connection", (ws: WebSocket) => {
+	ws.on("message", (raw: Event) => {
 		const state = handler.getState(ws);
-		if (state === "lobby") {
+		if (state === "register") {
+			const m = JSON.parse(raw.toString()) as msg.ClientLobbyMessage;
+			if (m.type !== "signin") return;
+			if (m.name === "") return;
+			handler.register(ws, m.name);
+		} else if (state === "lobby") {
 			try {
 				const m = JSON.parse(raw.toString()) as msg.ClientLobbyMessage;
 				switch (m.type) {
-					case "signin":
-						if (m.name === "") return;
-						handler.register(ws, m.name);
-						break;
 					case "create":
 						handler.create(ws, m.id);
 						break;

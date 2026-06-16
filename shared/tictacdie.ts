@@ -1,3 +1,5 @@
+import * as rand from "./random.ts";
+
 export type Empty = "";
 export type Symbol = "X" | "O";
 
@@ -10,7 +12,9 @@ export type TTT = {kind: "ttt"}; // TODO
 export type Cell = Empty | Symbol | Nomad | Immunity | Trap | Virus | TTT;
 	
 export type Player = {
-	name: string;
+	name: string,
+	symbol: Symbol
+	jokers: string[]
 }; // class Player
 
 export class Game {
@@ -19,18 +23,26 @@ export class Game {
 	p1: Player;
 	p2: Player;
 
-	constructor(seed: number, p1: Player, p2: Player) {
+	constructor(seed: number, p1: string, p2: string) {
 		this.board = [
 			["", "", ""],
 			["", "", ""],
 			["", "", ""]
 		];
-		this.p1 = p1; this.p2 = p2;
-		this.turn = 1;
+		this.p1 = {name: p1, symbol: "X", jokers: []} as Player;
+		this.p2 = {name: p2, symbol: "O", jokers: []} as Player;
+		this.turn = rand.randInt(seed, 0,1);
+		
+		const jokers = ["invert", "resize", "bomb", "nomad", "immunity", "trap", "virus"]; //, "ttt"];
+		for (let i = 0; i < 4; i++) {
+			const idx = rand.randInt(seed, 0, jokers.length);
+			this.p1.jokers.push(jokers[idx]);
+			this.p2.jokers.push(jokers[idx]);
+			jokers.splice(idx, 1);
+		}
 	}; // constructor
 
 	tick() {
-		// console.log("START", this.board);
 		for (let j=0; j < this.board.length; j++) {
 			for (let i=0; i < this.board[0].length; i++) {
 				let cell = this.board[j][i];
@@ -76,68 +88,97 @@ export class Game {
 
 			}
 		}
-		// console.log("END", this.board);
 		this.turn++;
 	}; // tick	
 
+	#getCellSymbol(cell: Cell): Empty | Symbol {
+		if (typeof cell === "object") {
+			if (cell.kind === "nomad") { return cell.content; }
+			if (cell.kind === "immunity") { return this.#getCellSymbol(cell.content); }
+			if (cell.kind === "virus") { return cell.content; }
+			return "";
+		} else {
+			return cell;
+		}
+	}
 	// -1: not over; 0: draw; 1: player1; 2: player2
 	isGameOver(): number {
-		return -1;
+		let filled = true; // flag if board contains an empty cell
+
+		let diagSymbol = this.#getCellSymbol(this.board[0][0]);
+		let diag = (diagSymbol !== "");
+		let inv_diagSymbol = this.#getCellSymbol(this.board[this.board.length-1][0]);
+		let inv_diag = (inv_diagSymbol !== "");
+
+		for (let i=0; i < this.board.length; i++) {
+			let rowSymbol = this.#getCellSymbol(this.board[i][0]);
+			let rowWinner = (rowSymbol !== "");
+			let colSymbol = this.#getCellSymbol(this.board[0][i]);
+			let colWinner = (colSymbol !== "");
+
+			for (let j=1; j < this.board.length; j++) {
+				if (filled && this.#getCellSymbol(this.board[i][j]) === "") filled = false;
+
+				if (rowWinner && rowSymbol !== this.#getCellSymbol(this.board[i][j])) rowWinner = false;
+				if (colWinner && colSymbol !== this.#getCellSymbol(this.board[j][i])) colWinner = false;
+				if (!rowWinner && !colWinner) break;
+			}
+			
+			if (rowWinner) return (rowSymbol === this.p1.symbol) ? 1 : 2;
+			if (colWinner) return (colSymbol === this.p1.symbol) ? 1 : 2;
+
+			if (diag && diagSymbol !== this.#getCellSymbol(this.board[i][i])) diag = false;
+			if (inv_diag && inv_diagSymbol !== this.#getCellSymbol(this.board[this.board.length-1-i][i])) inv_diag = false;
+		}
+
+		if (diag) return (diagSymbol === this.p1.symbol) ? 1 : 2;
+		if (inv_diag) return (inv_diagSymbol === this.p1.symbol) ? 1 : 2;
+
+		return filled ? 0 : -1;
 	}; // isGameOver
 
 	action(player_index: number, card: string, x: number, y:number, opt1: number, opt2: number, opt3: string): [boolean, string] {
 		if (player_index !== 1 - this.turn%2) return [false, "not your turn"]; // not your turn
-		// if (x < 0 || x > this.board[0].length-1) return [false, "invalid x position"];
-		// if (y < 0 || y > this.board.length-1) return [false, "invalid y position"];
 
 		let res = false;
 		let message = "";
 
 		if (card === "invert") {
-			res = this.applyInvert(x, y);
-			message = "invert";
+			[res, message] = this.applyInvert(x, y);
 
 		} else if (card === "resize") {
-			res = this.applyResize(x === 1, y === 1, opt1 === 1, opt2 === 1);
-			message = "resize";
+			[res, message] = this.applyResize(x === 1, y === 1, opt1 === 1, opt2 === 1);
 
 		} else if (card === "bomb") {
-			res = this.applyBomb(x, y);
-			message = "bomb";
+			[res, message] = this.applyBomb(x, y);
 
 		} else if (card === "symbol") {
-			res = this.placeSymbol(x, y, opt3 as Symbol);
-			message = "symbol";
+			[res, message] = this.placeSymbol(x, y, opt3 as Symbol);
 
 		} else if (card === "nomad") {
-			res = this.placeNomad(x, y, opt1, opt2, opt3 as Symbol);
-			message = "nomad";
+			[res, message] = this.placeNomad(x, y, opt1, opt2, opt3 as Symbol);
 
 		} else if (card === "immunity") {
-			res = this.placeImmunity(x, y);
-			message = "immunity";
+			[res, message] = this.placeImmunity(x, y);
 
 		} else if (card === "trap") {
-			res = this.placeTrap(x, y, opt1, opt2);
-			message = "trap";
+			[res, message] = this.placeTrap(x, y, opt1, opt2);
 
 		} else if (card === "virus") {
-			res = this.placeVirus(x, y);
-			message = "virus";
+			[res, message] = this.placeVirus(x, y);
 
 		} else if (card === "ttt") {
-			res = true;
-			message = "ttt";
+			[res, message] = this.placeTTT(0, 0);
 		}
 
 		this.tick();
 		return [res, message];
 	} // action
 
-	applyInvert(row: number, index: number): boolean {
-		if (row !== 0 && row !== 1) return false;
-		if (row === 1 && (index < 0 || index > this.board[0].length)) return false;
-		if (row === 0 && (index < 0 || index > this.board.length)) return false;
+	applyInvert(row: number, index: number): [boolean, string] {
+		if (row !== 0 && row !== 1) return [false, "Invalid row parameter"];
+		if (row === 1 && (index < 0 || index > this.board[0].length)) return [false, "Invalid index parameter"];
+		if (row === 0 && (index < 0 || index > this.board.length)) return [false, "Invalid index parameter"];
 		
 		if (row === 1) {
 			for (let x=0; x < this.board[0].length; x++) {
@@ -162,11 +203,11 @@ export class Game {
 				this.board[y][index] = cell;
 			}
 		}
-		return true;
+		return [true, ""];
 	}; // applyInvert
 	
-	applyResize(top: boolean, bottom: boolean, left: boolean, right: boolean): boolean {
-		if (!(top || bottom) || !(left || right)) return false;
+	applyResize(top: boolean, bottom: boolean, left: boolean, right: boolean): [boolean, string] {
+		if (!(top || bottom) || !(left || right)) return [false, "Invalid parameter given"];
 
 		const rowOffset = top ? 1 : 0;
 		const colOffset = left ? 1 : 0;
@@ -182,12 +223,12 @@ export class Game {
 		}
 		this.board = newBoard;	
 
-		return true;
+		return [true, ""];
 	}; // applyResize
 	
-	applyBomb(x: number, y: number): boolean {
-		if (x < 0 || x > this.board[0].length) return false;
-		if (y < 0 || y > this.board.length) return false;
+	applyBomb(x: number, y: number): [boolean, string] {
+		if (x < 0 || x > this.board[0].length) return [false, "Invalid x coordinate"];
+		if (y < 0 || y > this.board.length) return [false, "Invalid y coordinate"];
 
 		const cross = [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1]];
 		for (const [dy, dx] of cross) {
@@ -200,12 +241,12 @@ export class Game {
 		    this.board[ny][nx] = "";
 		}
 
-		return true;
+		return [true, ""];
 	}; // applyBomb
 
-	placeSymbol(x: number, y: number, s: Symbol): boolean {
-		if (x < 0 || x > this.board[0].length) return false;
-		if (y < 0 || y > this.board.length) return false;
+	placeSymbol(x: number, y: number, s: Symbol): [boolean, string] {
+		if (x < 0 || x > this.board[0].length) return [false, "Invalid x coordinate"];
+		if (y < 0 || y > this.board.length) return [false, "Invalid y coordinate"];
 
 		const cell = this.board[y][x];
 		if (typeof cell === "object" && cell.kind === "trap") {
@@ -217,45 +258,46 @@ export class Game {
 			}
 		} else if (typeof cell === "string" && cell === "") {
 			this.board[y][x] = s;
-		} else { return false; }
-		return true;
+		} else { return [false, "Cannot place a symbol in this cell"]; }
+		return [true, ""];
 	}; // placeSymbol
 
-	placeNomad(x: number, y: number, dirx: number, diry: number, s: Symbol): boolean {
-		if (x !== 0 && x !== this.board[0].length-1 && y !== 0 && y !== this.board.length-1) return false;
-		if ((diry === 0 && dirx !== -1 && dirx !== 1) || (dirx === 0 && diry !== -1 && diry !== 1)) return false;
+	placeNomad(x: number, y: number, dirx: number, diry: number, s: Symbol): [boolean, string] {
+		if (x !== 0 && x !== this.board[0].length-1 && y !== 0 && y !== this.board.length-1) return [false, "Nomad can only placed on a border"];
+		if ((diry === 0 && dirx !== -1 && dirx !== 1) || (dirx === 0 && diry !== -1 && diry !== 1)) return [false, "Invalid direction given"];
+		if (diry !== 0 && dirx !== 0) return [false, "Invalid direction given"];
 
 		const content = this.board[y][x];
 		this.board[y][x] = {kind: "nomad", cooldown: 1, dirx: dirx, diry: diry, content: s, old_content: content};
-		return true;
+		return [true, ""];
 	}; // placeNomad
 
-	placeImmunity(x: number, y: number): boolean {
-		if (x < 0 || x > this.board[0].length-1) return false;
-		if (y < 0 || y > this.board.length-1) return false;
+	placeImmunity(x: number, y: number): [boolean, string] {
+		if (x < 0 || x > this.board[0].length-1) return [false, "Invalid x coordinate"];
+		if (y < 0 || y > this.board.length-1) return [false, "Invalid y coordinate"];
 
 		const content = this.board[y][x];
 		this.board[y][x] = {kind: "immunity", cooldown: 2, content: content};
-		return true;
+		return [true, ""];
 	}; // placeImmunity
 
-	placeVirus(x: number, y: number): boolean {
-		if (x < 0 || x > this.board[0].length-1) return false;
-		if (y < 0 || y > this.board.length-1) return false;
+	placeVirus(x: number, y: number): [boolean, string] {
+		if (x < 0 || x > this.board[0].length-1) return [false, "Invalid x coordinate"];
+		if (y < 0 || y > this.board.length-1) return [false, "Invalid y coordinate"];
 		this.board[y][x] = {kind: "virus", content: ""};
-		return true;
+		return [true, ""];
 	}; // placeVirus
 	
-	placeTrap(x: number, y: number, ax: number, ay: number): boolean {
-		if (x < 0 || x >= this.board[0].length) return false;
-		if (y < 0 || y >= this.board.length) return false;
-		if (ax < 0 || ax >= this.board[0].length) return false;
-		if (ay < 0 || ay >= this.board.length) return false;
-		if (this.board[y][x] !== "") return false;
+	placeTrap(x: number, y: number, ax: number, ay: number): [boolean, string] {
+		if (x < 0 || x >= this.board[0].length) return [false, "Invalid x coordinate"];
+		if (y < 0 || y >= this.board.length) return [false, "Invalid y coordinate"];
+		if (ax < 0 || ax >= this.board[0].length) return [false, "Invalid ax coordinate"];
+		if (ay < 0 || ay >= this.board.length) return [false, "Invalid ay coordinate"];
+		if (this.board[y][x] !== "") return [false, "Trap can only be placed on empty squares"];
 
 		this.board[y][x] = {kind: "trap", newx: ax, newy: ay};
-		return true;
+		return [true, ""];
 	}; // placeTrap
 
-	placeTTT(x: number, y: number) {}; // placeTTT
+	placeTTT(x: number, y: number): [boolean, string] { return [true, ""]; }; // placeTTT
 }; // class Game
