@@ -269,7 +269,11 @@ export function error(ws: WebSocket, msg: string) {
 		if (!player) return close(ws);
 		const game = GAMES.get(player.game);
 		if (!game) return close(ws);
-		return ws.send(JSON.stringify({type: "ko", message: msg, board: game.game.board} as msg.ServerGameMessage));
+		return ws.send(JSON.stringify({
+			type: "ko", message: msg,
+			board: game.game.board, turn: game.game.turn,
+			p1: game.game.p1, p2: game.game.p2
+		} as msg.ServerGameMessage));
 	}
 } // error
 

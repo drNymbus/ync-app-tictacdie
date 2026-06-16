@@ -1,4 +1,4 @@
-import { Cell } from './tictacdie.ts'
+import { Symbol, Cell } from './tictacdie.ts'
 
 export type ClientLobbyMessage =
 	| {type: "signin", name: string}
@@ -26,5 +26,9 @@ export type ClientGameMessage = {
 export type ServerGameMessage =
 	| {type: "gameover", result: number} // 0:draw; 1:player1, 2:player2 
 	| {type: "ok"}
-	| {type: "ko", message: string, board: Cell[][]}
-	| {type: "closing"};
+	| {type: "closing"}
+	| {
+		type: "ko", message: string, board: Cell[][], turn: number,
+		p1: {name: string, symbol: Symbol, jokers: string[]},
+		p2: {name: string, symbol: Symbol, jokers: string[]}
+	};
