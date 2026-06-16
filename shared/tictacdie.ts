@@ -291,7 +291,21 @@ export class Game {
 	placeVirus(x: number, y: number): [boolean, string] {
 		if (x < 0 || x > this.board[0].length-1) return [false, "Invalid x coordinate"];
 		if (y < 0 || y > this.board.length-1) return [false, "Invalid y coordinate"];
-		this.board[y][x] = {kind: "virus", content: ""};
+
+		const v = {kind: "virus", content: ""};
+
+		const cell = this.board[y][x];
+		if (typeof cell === "object" && cell.kind === "trap") {
+			if (this.board[cell.newy][cell.newx] === "") {
+				this.board[y][x] = "";
+				this.board[cell.newy][cell.newx] = v;
+			} else {
+				this.board[y][x] = v;
+			}
+		} else if (typeof cell === "string" && cell === "") {
+			this.board[y][x] = v;
+		} else { return [false, "Cannot place a symbol in this cell"]; }
+
 		return [true, ""];
 	}; // placeVirus
 	
