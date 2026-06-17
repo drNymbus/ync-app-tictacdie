@@ -140,8 +140,11 @@ export class Game {
 	action(player_index: number, card: string, x: number, y:number, opt1: number, opt2: number, opt3: string): [boolean, string] {
 		if (player_index !== 1 - this.turn%2) return [false, "Not your turn"]; // not your turn
 
-		if (player_index === 0 && !this.p1.jokers.include(card)) return [false, "You do not possess this joker"];
-		if (player_index === 1 && !this.p2.jokers.include(card)) return [false, "You do not possess this joker"];
+		// "symbol" n'est pas un joker (pose normale) : pas de check de possession ni de retrait.
+		if (card !== "symbol") {
+			if (player_index === 0 && !this.p1.jokers.includes(card)) return [false, "You do not possess this joker"];
+			if (player_index === 1 && !this.p2.jokers.includes(card)) return [false, "You do not possess this joker"];
+		}
 
 		let res = false;
 		let message = "";
@@ -176,8 +179,10 @@ export class Game {
 
 		if (res) {
 			this.tick();
-			if (player_index === 0) this.p1.jokers.splice(this.p1.jokers.indexOf(card));
-			if (player_index === 1) this.p2.jokers.splice(this.p1.jokers.indexOf(card));
+			if (card !== "symbol") {
+				if (player_index === 0) this.p1.jokers.splice(this.p1.jokers.indexOf(card), 1);
+				if (player_index === 1) this.p2.jokers.splice(this.p2.jokers.indexOf(card), 1);
+			}
 		}
 		return [res, message];
 	} // action
@@ -292,7 +297,7 @@ export class Game {
 		if (x < 0 || x > this.board[0].length-1) return [false, "Invalid x coordinate"];
 		if (y < 0 || y > this.board.length-1) return [false, "Invalid y coordinate"];
 
-		const v = {kind: "virus", content: ""};
+		const v: Virus = {kind: "virus", content: ""};
 
 		const cell = this.board[y][x];
 		if (typeof cell === "object" && cell.kind === "trap") {
