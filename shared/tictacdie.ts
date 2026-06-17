@@ -289,6 +289,9 @@ export class Game {
 		if (y < 0 || y > this.board.length-1) return [false, "Invalid y coordinate"];
 
 		const content = this.board[y][x];
+		// L'immunité ne peut protéger qu'un symbole déjà posé (pas une case vide ni un autre joker).
+		if (content !== "X" && content !== "O") return [false, "Immunity can only be placed on a symbol"];
+
 		this.board[y][x] = {kind: "immunity", cooldown: 2, content: content};
 		return [true, ""];
 	}; // placeImmunity

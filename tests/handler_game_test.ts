@@ -98,7 +98,7 @@ Deno.test("action - acting out of turn sends ko", () => {
 	handler.action(cast(a), {type: "action", card: "symbol", player: 1, x: 0, y: 0, opt1: 0, opt2: 0, opt3: "X"});
 	const m = last(a) as { type: string; message: string };
 	assertEquals(m.type, "ko");
-	assertEquals(m.message, "not your turn");
+	assertEquals(m.message, "Not your turn");
 });
 
 // ─── action - success path ────────────────────────────────────────────────────

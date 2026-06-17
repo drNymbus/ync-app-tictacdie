@@ -129,14 +129,22 @@ Deno.test("placeNomad - leftward from right border accepted", () => {
 
 // ─── placeImmunity ───────────────────────────────────────────────────────────
 
-Deno.test("placeImmunity - cooldown decrements each tick and cell disappears", () => {
+Deno.test("placeImmunity - cooldown decrements each tick and content restored on expiry", () => {
 	const g = makeGame();
+	g.board[0][0] = "X";
 	g.placeImmunity(0, 0);
-	assertEquals(g.board[0][0], {kind: "immunity", cooldown: 2, content: ""});
+	assertEquals(g.board[0][0] as ttd.Cell, {kind: "immunity", cooldown: 2, content: "X"});
 	g.tick();
-	assertEquals(g.board[0][0], {kind: "immunity", cooldown: 1, content: ""});
+	assertEquals(g.board[0][0] as ttd.Cell, {kind: "immunity", cooldown: 1, content: "X"});
 	g.tick(); g.tick();
-	assertEquals(g.board[0][0], "");
+	assertEquals(g.board[0][0], "X");
+});
+
+Deno.test("placeImmunity - rejected on empty cell or non-symbol", () => {
+	const g = makeGame();
+	assertEquals(g.placeImmunity(0, 0)[0], false); // case vide
+	g.placeTrap(1, 1, 2, 2);
+	assertEquals(g.placeImmunity(1, 1)[0], false); // autre joker
 });
 
 Deno.test("placeImmunity - restores wrapped content on expiry", () => {

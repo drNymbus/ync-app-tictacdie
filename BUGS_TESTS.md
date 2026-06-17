@@ -17,7 +17,7 @@ Domaine : **serveur** (Victor) · **front** (Alexis) · **partagé**
   if (res) this.tick();
   return [res, message];
   ```
-- **Statut** : ✅ **corrigé par Victor** (branche `libgame_part1`, commit `f48683c`) — `action()` ne ticke plus que si `res`. ⚠️ Le client (`game.js`) ne resync toujours pas le tour ; le `"ko"` enrichi (`turn`, `p1`, `p2`) est désormais dispo pour le faire — **à brancher côté front**.
+- **Statut** : ✅ **corrigé** — serveur (Victor, commit `f48683c`) : `action()` ne ticke plus que si `res`. Front (Alexis) : `onServerMessage("ko")` resync désormais le **tour** et les **jokers** depuis le `"ko"` enrichi via `syncFromServer()` (resync joker autoritatif uniquement hors `DEBUG_ALL_JOKERS`).
 
 ---
 
@@ -27,7 +27,7 @@ Domaine : **serveur** (Victor) · **front** (Alexis) · **partagé**
 - **Contexte** : chaque joker doit être utilisable **une seule fois** par partie. La garde est faite côté client (`game.js` : un joker consommé est grisé/non cliquable), mais le serveur ne vérifie rien.
 - **Risque** : un client modifié peut rejouer plusieurs fois le même joker — le serveur l'accepte.
 - **Fix proposé** : la liste des jokers de chaque joueur existe déjà dans `Game` (`p1.jokers` / `p2.jokers`, tirée du seed). Dans `action()`, vérifier que le joker demandé est encore dans la liste du joueur, puis le retirer après succès. Refuser sinon (`[false, "joker already used"]`).
-- **Statut** : ✅ **implémenté par Victor** (commit `f48683c`) — check de possession + retrait du joker sur succès. ⚠️ Mais l'implémentation contenait plusieurs bugs (cf. #5, #6, #7), corrigés au merge dans `front`.
+- **Statut** : ✅ **implémenté par Victor** (commit `f48683c`) — check de possession + retrait du joker sur succès. ⚠️ Mais l'implémentation contenait plusieurs bugs (cf. #5, #6, #7), corrigés au merge dans `front`. Côté front, `syncFromServer()` resync l'état `usedJokers` depuis la liste autoritaire `p1/p2.jokers` du `"ko"` (hors `DEBUG_ALL_JOKERS`).
 
 ---
 

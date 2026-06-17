@@ -35,12 +35,12 @@ Deno.test("action - player_index 2 is invalid", () => {
 	assertEquals(g.action(2, "symbol", 0, 0, 0, 0, "X")[0], false);
 });
 
-Deno.test("action - unknown card: returns false, tick still runs", () => {
+Deno.test("action - unknown card: returns false, tick does NOT run", () => {
 	const g = makeGame();
 	const turnBefore = g.turn;
 	const [ok] = g.action(0, "unknown_card", 0, 0, 0, 0, "");
 	assertEquals(ok, false);
-	assertEquals(g.turn, turnBefore + 1); // tick ran
+	assertEquals(g.turn, turnBefore); // échec → tick ne tourne pas, tour inchangé
 });
 
 // ─── action - turn management ─────────────────────────────────────────────────
@@ -53,13 +53,13 @@ Deno.test("action - turn passes to opponent after success", () => {
 	assertEquals(g.board[1][1], "O");
 });
 
-Deno.test("action - tick always runs when card is valid even if card fails", () => {
-	// placeSymbol fails on occupied cell, but tick() is still called
+Deno.test("action - tick does NOT run when the card fails", () => {
+	// placeSymbol fails on occupied cell → tick() n'est pas appelé (fix #1 : tick seulement sur succès)
 	const g = makeGame();
 	g.board[0][0] = "O";
 	const turnBefore = g.turn;
 	g.action(0, "symbol", 0, 0, 0, 0, "X"); // occupied → placeSymbol returns false
-	assertEquals(g.turn, turnBefore + 1);
+	assertEquals(g.turn, turnBefore); // échec → tour inchangé
 	assertEquals(g.board[0][0], "O");
 });
 
@@ -104,6 +104,7 @@ Deno.test("action symbol - out of bounds returns false", () => {
 
 Deno.test("action invert - inverts a row", () => {
 	const g = makeGame();
+	g.p1.jokers.push("invert"); // accorder le joker (sinon refus par le check de possession)
 	g.board[0] = ["X", "O", "X"];
 	const [ok] = g.action(0, "invert", 1, 0, 0, 0, "");
 	assertEquals(ok, true);
@@ -112,6 +113,7 @@ Deno.test("action invert - inverts a row", () => {
 
 Deno.test("action invert - inverts a column", () => {
 	const g = makeGame();
+	g.p1.jokers.push("invert"); // accorder le joker (sinon refus par le check de possession)
 	g.board[0][0] = "X"; g.board[1][0] = "O"; g.board[2][0] = "X";
 	// x=0 → row param=0 (column mode), y=0 → index=0 (column 0)
 	const [ok] = g.action(0, "invert", 0, 0, 1, 0, "");
@@ -176,6 +178,7 @@ Deno.test("action resize - no corner selected: returns false, board unchanged", 
 
 Deno.test("action trap - places trap at (x,y) with redirect (opt1, opt2)", () => {
 	const g = makeGame();
+	g.p1.jokers.push("trap"); // accorder le joker (sinon refus par le check de possession)
 	const [ok] = g.action(0, "trap", 0, 0, 2, 2, "");
 	assertEquals(ok, true);
 	assertEquals(g.board[0][0], {kind: "trap", newx: 2, newy: 2});
@@ -225,6 +228,7 @@ Deno.test("action nomad - diagonal direction returns false", () => {
 
 Deno.test("action immunity - places immunity on cell (tick runs, cooldown 2→1)", () => {
 	const g = makeGame();
+	g.board[0][0] = "X"; // l'immunité ne se pose que sur un symbole déjà présent
 	const [ok] = g.action(0, "immunity", 0, 0, 0, 0, "");
 	assertEquals(ok, true);
 	assertEquals((g.board[0][0] as unknown as ttd.Immunity).kind, "immunity");
@@ -241,6 +245,7 @@ Deno.test("action immunity - out of bounds returns false", () => {
 
 Deno.test("action virus - places virus on cell", () => {
 	const g = makeGame();
+	g.p1.jokers.push("virus"); // accorder le joker (sinon refus par le check de possession)
 	const [ok] = g.action(0, "virus", 1, 1, 0, 0, "");
 	assertEquals(ok, true);
 	assertEquals((g.board[1][1] as unknown as ttd.Virus).kind, "virus");

@@ -638,9 +638,13 @@ function onCellClick(x, y) {
 	}
 
 	switch (card) {
+		// L'immunité ne se pose que sur un symbole déjà présent (cf. placeImmunity côté shared).
+		case "immunity":
+			if (board[y][x] !== "X" && board[y][x] !== "O") return; // case invalide : on n'envoie rien, joker non consommé
+			sendAction({ type: "action", card, x, y, opt1: 0, opt2: 0, opt3: "" });
+			break;
 		// Cible unique : un clic suffit.
 		case "bomb":
-		case "immunity":
 		case "virus":
 			sendAction({ type: "action", card, x, y, opt1: 0, opt2: 0, opt3: "" });
 			break;
@@ -855,7 +859,32 @@ function setTurn(b) {
 }
 
 // --- Réseau ---
-// Messages serveur (cf. handler.ts) : "action" (coup adverse), "ko" (refus + board),
+// Resync autoritatif depuis un message serveur portant turn + p1/p2 (cf. "ko" enrichi, protocol.ts).
+// Remplace l'heuristique "la main me revient" + le rollback optimiste du joker par l'état réel serveur.
+function syncFromServer(m) {
+	// Tour : joueur actif côté serveur = 1 - turn%2 (cf. Game.action) ; mon index serveur = myIndex-1.
+	if (typeof m.turn === "number") myTurn = (myIndex - 1) === (1 - m.turn % 2);
+	else myTurn = true; // repli : pas de turn dans le message → la main me revient
+
+	// Jokers : la liste serveur (p1/p2) ne contient que les jokers ENCORE disponibles → autoritatif.
+	// Ignoré en DEBUG_ALL_JOKERS : le client a les 7 jokers, le serveur seulement les 4 de la seed,
+	// donc un resync marquerait à tort les 3 hors-seed comme consommés. On garde alors le rollback optimiste.
+	const mine = (myIndex === 1) ? m.p1 : m.p2;
+	if (!DEBUG_ALL_JOKERS && mine && Array.isArray(mine.jokers)) {
+		const remaining = [...mine.jokers];
+		usedJokers = myJokers.map((j) => {
+			const k = remaining.indexOf(j);
+			if (k === -1) return true;   // absent de la liste serveur → consommé
+			remaining.splice(k, 1);      // consomme l'occurrence (gère d'éventuels doublons)
+			return false;
+		});
+	} else if (pendingJokerIndex !== null) {
+		usedJokers[pendingJokerIndex] = false; // repli (debug / message sans p1-p2) : rollback optimiste
+	}
+	pendingJokerIndex = null;
+}
+
+// Messages serveur (cf. handler.ts) : "action" (coup adverse), "ko" (refus + board + turn/p1/p2),
 // "gameover" (result, -1 = pas fini), "closing" (fermeture serveur).
 function onServerMessage(m) {
 	switch (m.type) {
@@ -872,11 +901,10 @@ function onServerMessage(m) {
 			break;
 
 		case "ko":
-			// Action refusée : resync autoritatif via le board renvoyé, la main me revient.
+			// Action refusée : resync autoritatif (board + turn + jokers) depuis le "ko" enrichi.
 			if (m.board) board = m.board;
-			if (pendingJokerIndex !== null) { usedJokers[pendingJokerIndex] = false; pendingJokerIndex = null; } // rollback du joker
+			syncFromServer(m); // remplace l'ancien setTurn(true) + rollback optimiste du joker
 			console.warn("Action refusée :", m.message);
-			setTurn(true);
 			renderAll();
 			break;
 
