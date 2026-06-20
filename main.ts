@@ -2,20 +2,22 @@ import { createServer } from "node:http";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { WebSocketServer, WebSocket } from "npm:ws";
+
 import * as msg from "./shared/protocol.ts";
 import * as handler from "./handler.ts";
 
-const page = (f: string) => readFileSync(join("client", f), "utf8");
+const port = parseInt(Deno.env.get("PORT")) || 3000;
+
+const page = (f: string) => readFileSync(join(Deno.cwd() + "/client", f), "utf8");
 
 const server = createServer((req, res) => {
-	const url = new URL(req.url!, "http://x");
-
-	if (url.pathname === "/") {
+	const pathname = req.url!;
+	if (pathname === "/" || pathname === "index.html") {
 		res.end(page("index.html"));
-	} else if (url.pathname === "/lobby.js") {
+	} else if (pathname === "/lobby.js") {
 		res.setHeader("content-type", "text/javascript");
 		res.end(page("lobby.js"));
-	} else if (url.pathname === "/game.js") {
+	} else if (pathname === "/game.js") {
 		res.setHeader("content-type", "text/javascript");
 		res.end(page("game.js"));
 	} else {
@@ -77,4 +79,4 @@ wss.on("connection", (ws: WebSocket) => {
 	ws.on("close", () => { handler.close(ws); });
 });
 
-server.listen(3000, () => console.log("http://localhost:3000"));
+server.listen(port, () => console.log("Listening on port:", port));
