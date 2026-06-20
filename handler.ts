@@ -17,7 +17,7 @@ export function _resetForTest() {
 	GAMES.clear();
 }
 
-function sendLobbies(ws: WebSocket) {
+export function sendLobbies(ws: WebSocket) {
 	let lobbies = [];
 	for (const [key, lobby] of LOBBIES) {
 		if (!lobby.ingame) {

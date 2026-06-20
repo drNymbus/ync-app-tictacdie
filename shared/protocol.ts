@@ -4,6 +4,7 @@ export type ClientLobbyMessage =
 	| {type: "signin", name: string}
 	| {type: "create", id: string}
 	| {type: "join", id: string}
+	| {type: "refresh"}
 	| {type: "ready"}
 	| {type: "leave"};
 

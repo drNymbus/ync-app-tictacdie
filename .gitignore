@@ -2,4 +2,5 @@
 CLAUDE.md
 *.pen
 start
+start.bat
 client/app.js

@@ -5,41 +5,37 @@ import { WebSocketServer, WebSocket } from "npm:ws";
 import * as msg from "./shared/protocol.ts";
 import * as handler from "./handler.ts";
 
-const page = (f: string) => readFileSync(join("client", f), "utf8");
+const port = Number(Deno.env.get("PORT")) || 3000;
+
+// content-type par extension (tout est servi depuis client/ : html/js/css + assets).
+const MIME: Record<string, string> = {
+	".html": "text/html",
+	".js": "text/javascript",
+	".css": "text/css",
+	".png": "image/png",
+	".mp4": "video/mp4",
+};
+
+// Lecture binaire (Buffer, pas d'encodage) : indispensable pour les APNG/vidéos — un read
+// "utf8" corromprait les octets. Le texte (html/js/css) est servi tel quel, le navigateur
+// le décode via le content-type.
+const page = (f: string) => readFileSync(join(Deno.cwd(), "client", f));
 
 const server = createServer((req, res) => {
+	// new URL : pathname normalisé (".." résolu, pas de path traversal) et SANS query string
+	// (les assets sont demandés avec un cache-buster "?t=..." qu'il faut retirer du chemin de fichier).
 	const url = new URL(req.url!, "http://x");
+	const path = url.pathname === "/" ? "index.html" : url.pathname;
+	const ext = path.slice(path.lastIndexOf("."));
 
-	if (url.pathname === "/") {
-		res.end(page("index.html"));
-	} else if (url.pathname === "/lobby.js") {
-		res.setHeader("content-type", "text/javascript");
-		res.end(page("lobby.js"));
-	} else if (url.pathname === "/game.js") {
-		res.setHeader("content-type", "text/javascript");
-		res.end(page("game.js"));
-	} else if (url.pathname === "/game.css") {
-		res.setHeader("content-type", "text/css");
-		res.end(page("game.css"));
-	} else if (url.pathname === "/lobby.css") {
-		res.setHeader("content-type", "text/css");
-		res.end(page("lobby.css"));
-	} else if (url.pathname.startsWith("/assets/")) {
-		try {
-			const name = url.pathname.slice("/assets/".length);
-			// lecture binaire (pas d'encodage utf8) pour les APNG / vidéos
-			const data = readFileSync(join("client", "assets", name));
-			const ct = name.endsWith(".mp4") ? "video/mp4"
-				: name.endsWith(".png") ? "image/png"
-				: "application/octet-stream";
-			res.setHeader("content-type", ct);
-			res.end(data);
-		} catch {
-			res.statusCode = 404;
-			res.end();
-		}
-	} else {
+	try {
+		if (ext === ".ts") throw Error(); // on ne sert jamais les sources TS au navigateur
+		res.setHeader("content-type", MIME[ext] ?? "application/octet-stream");
+		res.end(page(path));
+	} catch {
+		// fichier inexistant -> page d'erreur.
 		res.statusCode = 404;
+		res.setHeader("content-type", "text/html");
 		res.end(page("error.html"));
 	}
 });
@@ -63,6 +59,9 @@ wss.on("connection", (ws: WebSocket) => {
 						break;
 					case "join":
 						handler.join(ws, m.id);
+						break;
+					case "refresh":
+						handler.sendLobbies(ws);
 						break;
 					case "ready":
 						handler.ready(ws);
@@ -94,4 +93,4 @@ wss.on("connection", (ws: WebSocket) => {
 	ws.on("close", () => { handler.close(ws); });
 });
 
-server.listen(3000, () => console.log("http://localhost:3000"));
+server.listen(port, () => console.log("Listening on port:", port));
