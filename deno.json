@@ -1,6 +1,8 @@
 {
   "tasks": {
-    "dev": "deno run --watch --allow-net --allow-env --allow-read main.ts"
+    "bundle": "deno bundle --platform browser client/lobby.ts -o client/app.js",
+    "bundle:watch": "deno bundle --platform browser --watch client/lobby.ts -o client/app.js",
+    "dev": "deno task bundle && deno run --watch --allow-net --allow-env --allow-read main.ts"
   },
   "imports": {
     "@std/assert": "jsr:@std/assert@1",

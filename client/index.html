@@ -11,10 +11,11 @@
 	<body>
 		<div id="app"></div>
 
-		<!-- WS unique créé ici, puis lobby.js pilote la phase lobby.
-		     À la réception de "start", lobby passe la main à game.init(ws, startMsg). -->
+		<!-- WS unique créé ici, puis le lobby pilote la phase lobby.
+		     À la réception de "start", lobby passe la main à game.init(ws, startMsg).
+		     app.js = bundle esbuild de client/lobby.ts (+ game.ts et ses modules). -->
 		<script type="module">
-			import { init as lobbyInit } from "./lobby.js";
+			import { init as lobbyInit } from "./app.js";
 			const ws = new WebSocket(`ws://${location.host}`);
 			ws.addEventListener("open", () => lobbyInit(ws));
 			ws.addEventListener("error", (e) => console.error("WS error", e));

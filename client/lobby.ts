@@ -1,8 +1,8 @@
-// lobby.js — vue lobby (SPA).
+// lobby.ts — vue lobby (SPA).
 // Créé par index.html : le WS unique est passé à init(ws). À la réception de "start",
 // lobby fait son teardown puis passe la main à game.init(ws, startMsg).
 
-import { init as gameInit } from "./game.js";
+import { init as gameInit } from "./game.ts";
 
 // --- État ---
 let ws = null;
