@@ -1,62 +1,337 @@
-/* game.css — mise en forme de la vue de partie.
-   Styles minimaux en attendant la maquette Pencil / illustrations / animations.
-   Note : la largeur des colonnes de #board (grid-template-columns) reste pilotée
-   par game.js car elle dépend de la taille courante du board (N peut changer au Resize). */
+/* game.css — vue de partie.
+   Reproduit la maquette Pencil "Game — Fullscreen" : direction du lobby inversée
+   (fond papier clair, encre noire pour la grille / les boutons / les symboles).
+   Toutes les règles sont scopées sous #game pour ne pas entrer en collision avec lobby.css
+   (les deux feuilles sont chargées en même temps et partagent des noms de classes génériques).
+   Note : grid-template-columns de #board reste piloté par game.js (la taille du board
+   change au Resize). */
 
-/* --- Grille --- */
-#board {
-	display: grid;
-	gap: 4px;
-	position: relative; /* ancrage des flèches de coin (resize) */
+#game {
+	min-height: 100vh;
+	display: flex;
+	flex-direction: column;
+	background: #000000; /* noir derrière la vidéo (qui est à 50% d'opacité) */
+	color: #141414;
+	font-family: "Space Mono", monospace;
+	position: relative; /* ancrage de la vidéo de fond */
 }
 
-.cell {
-	width: 48px;
-	height: 48px;
-	border: 1px solid #888;
+/* --- Vidéo de fond (loop infini) --- */
+#game .bg-video {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	opacity: 0.25;
+	z-index: 0;
+}
+
+/* Fondu de sortie du jeu vers le lobby (cf. fondu lobby -> game). */
+#game.leaving { position: fixed; inset: 0; z-index: 2000; transition: opacity 2s ease; }
+#game.leaving.fade-out { opacity: 0; }
+
+/* --- Chorégraphie d'entrée (#game.intro, retirée par game.js une fois finie) ---
+   1) la grille apparaît en fondu ; 2) 1s après, les bandeaux arrivent des côtés
+   (easing avec léger rebond) pendant que les cartes apparaissent en fondu. */
+@keyframes g-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes g-slide-left  { from { opacity: 0; transform: translateX(-130%); } to { opacity: 1; transform: translateX(0); } }
+@keyframes g-slide-right { from { opacity: 0; transform: translateX(130%); }  to { opacity: 1; transform: translateX(0); } }
+
+/* départ décalé à 2s (après le fondu lobby -> game) */
+#game.intro #board-wrap { animation: g-fade 3s ease 1s both; }
+/* 4,2s = départ 2s + fondu grille 1,2s + 1s d'attente */
+#game.intro #players { animation: g-slide-left  1s cubic-bezier(0.34, 1.56, 0.64, 1) 4.2s both; }
+#game.intro #prompt  { animation: g-slide-right 1s cubic-bezier(0.34, 1.56, 0.64, 1) 4.2s both; }
+#game.intro #jokers,
+#game.intro .symbol-token { animation: g-fade 4s ease 4.2s both; }
+#game.intro .statusbar,
+#game.intro .footer,
+#game.intro .rule { animation: g-fade 1s ease 4.2s both; }
+/* contenu au-dessus de la vidéo */
+#game > .statusbar,
+#game > .wrap {
+	position: relative;
+	z-index: 1;
+}
+
+/* --- Barre de statut --- */
+#game .statusbar {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	height: 36px;
+	padding: 0 48px;
+	background: #1A1A1A;
+	border-bottom: 1px solid #333333;
+	font-size: 11px;
+}
+#game .statusbar .left  { color: #8A8470; }
+#game .statusbar .right { color: #F24242; } /* IN GAME en rouge */
+
+/* --- Zone centrale --- */
+#game .wrap {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-start; /* bloc principal vers le haut, dégagé de la main en bas */
+	align-items: center;
+	padding: 28px 40px 0;
+}
+#game .col {
+	width: 680px;
+	max-width: 100%;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 16px;
+}
+
+/* --- Bandeau joueurs --- */
+#game #players {
+	width: 100%;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	height: 80px;
+}
+#game .chip { display: flex; align-items: center; gap: 12px; }
+
+/* l'encart entoure SEULEMENT le symbole : éteint par défaut, allumé (teinté) quand c'est son tour */
+#game .sym-icon {
+	width: 80px;
+	height: 80px;
+	padding: 8px;
+	box-sizing: border-box;
+	object-fit: contain;
+	display: block;
+	border-radius: 10px;
+	transition: background-color 0.35s ease, box-shadow 0.35s ease, opacity 0.35s ease;
+}
+#game .chip:not(.active) .sym-icon { opacity: 0.4; } /* atténué hors tour, sans encart */
+#game .chip.active.chip-x .sym-icon { background: rgba(242, 66, 66, 0.28); box-shadow: 0 0 18px rgba(242, 66, 66, 0.30); }  /* croix : rouge */
+#game .chip.active.chip-o .sym-icon { background: rgba(74, 222, 106, 0.26); box-shadow: 0 0 18px rgba(74, 222, 106, 0.30); } /* rond : vert */
+#game .pname { font-size: 13px; color: #FFFFFF; }
+#game .pname.dim { color: rgba(255, 255, 255, 0.55); }
+#game #turn { font-size: 13px; font-weight: 700; color: #FFFFFF; }
+
+/* --- Règles horizontales --- */
+#game .rule { width: 100%; height: 1px; background: #D7D1C2; }
+
+/* --- Plateau --- */
+#game #board-wrap { width: 100%; display: flex; justify-content: center; padding: 18px 0; }
+#game #board {
+	display: grid;
+	gap: 3px;
+	background: #141414; /* l'écart laisse apparaître la grille noire */
+	padding: 3px;
+	position: relative; /* ancrage des coins de resize */
+}
+#game .cell {
+	width: 96px;
+	height: 96px;
+	background: #E5DFCF; /* blanc cassé légèrement plus sombre */
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 42px;
+	font-weight: 700;
+	color: #141414;
+	cursor: pointer;
+	overflow: hidden; /* borne le symbole agrandi à sa case (pas de débordement sur les voisines) */
+}
+#game .cell.selected { box-shadow: inset 0 0 0 3px #141414; } /* surbrillance d'un sous-flux */
+/* symbole posé (APNG XOXO) : occupe un peu plus que la case */
+#game .cell-sym { width: 100%; height: 100%; object-fit: contain; display: block; transform: scale(1.15); }
+
+/* --- Prompt + flèches de direction (nomad) --- */
+#game #prompt {
+	font-size: 11px;
+	color: #8A8470;
+	min-height: 16px;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	position: relative;
+	z-index: 300;         /* au-dessus des cartes (sélectionnée z100 / survol z200) pour cliquer les flèches */
+	top: -24px;           /* remonté un peu */
+	pointer-events: none; /* ne bloque pas les cartes derrière... */
+}
+#game .arrow {
+	border: 1px solid #141414;
+	background: #F6F3EB;
+	color: #141414;
+	font-family: inherit;
+	font-size: 13px;
+	padding: 4px 10px;
+	cursor: pointer;
+	pointer-events: auto; /* ...mais les flèches restent cliquables */
+}
+#game .arrow:hover { background: #141414; color: #F6F3EB; }
+
+/* --- Coins de resize : par-dessus le plateau --- */
+#game .corner {
+	position: absolute;
+	z-index: 10;
+	border: 1px solid #141414;
+	background: #F6F3EB;
+	color: #141414;
+	font-family: inherit;
+	font-size: 14px;
+	padding: 2px 6px;
+	cursor: pointer;
+}
+#game .corner-tl { top: -14px;    left: -14px; }
+#game .corner-tr { top: -14px;    right: -14px; }
+#game .corner-bl { bottom: -14px; left: -14px; }
+#game .corner-br { bottom: -14px; right: -14px; }
+
+/* --- Main de cartes : éventail ancré en bas-centre de l'écran --- */
+/* #jokers = point d'ancrage absolu ; les cartes (transform piloté par game.js) s'y empilent. */
+#game #jokers { position: absolute; left: 50%; bottom: -50px; width: 0; height: 0; z-index: 5; }
+
+#game .card {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	width: 270px;                  /* légèrement réduit */
+	height: 405px;                 /* ratio 2:3 = aspect natif des APNG (500x750) */
+	margin-left: -135px;           /* centre la carte sur l'ancre */
+	transform-origin: center bottom;
+	transition: transform 0.2s ease, opacity 0.3s ease;
+	cursor: pointer;
+}
+#game .joker-art { width: 100%; height: 100%; object-fit: contain; display: block; }
+#game .card.joker.used { opacity: 0; pointer-events: none; } /* joué : fondu invisible + incliquable */
+
+/* --- Jeton symbole : hors de la main, à droite, bordure blanche légère --- */
+#game .symbol-token {
+	position: absolute;
+	right: 150px;
+	bottom: 100px;
+	width: 110px;
+	height: 110px;
+	border: 2px solid rgba(255, 255, 255, 0.7);
+	border-radius: 50%;
+	background: rgba(20, 20, 20, 0.35);
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	cursor: pointer;
+	z-index: 6;
+	transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+#game .symbol-token .sym-art { width: 78%; height: 78%; object-fit: contain; display: block; }
+#game .symbol-token:hover { transform: scale(1.08); }
+/* sélectionné : la bordure pulse régulièrement (anneau qui s'étend et s'estompe) */
+#game .symbol-token.selected { border-color: #FFFFFF; animation: token-pulse 1.4s ease-in-out infinite; }
+@keyframes token-pulse {
+	0%   { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.55); }
+	70%  { box-shadow: 0 0 0 12px rgba(255, 255, 255, 0); }
+	100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
 }
 
-.cell.selected {
-	background: #cdf; /* surbrillance d'un sous-flux (trap/nomad/invert) */
+/* --- Animations d'effet (bombe, etc.), centrées sur une case --- */
+#game .effect {
+	position: fixed;
+	transform: translate(-50%, -50%); /* centre l'image sur (left, top) = centre de la case */
+	height: auto;
+	z-index: 500; /* au-dessus du plateau, sous l'overlay de fin */
+	pointer-events: none;
 }
 
-/* --- Cartes (4 jokers + symbole) --- */
-#jokers {
+/* Symbole en train d'être soufflé par la bombe : maintenu plein puis fondu + zoom/flou,
+   calé sur la durée de l'anim de bombe (2240 ms, cf. EFFECTS.bomb dans game.js). */
+#game .sym-fade {
+	position: fixed;
+	object-fit: contain;
+	z-index: 480; /* au-dessus du plateau, sous l'explosion (500) qui l'engloutit */
+	pointer-events: none;
+	animation: bomb-sym-fade 2240ms ease-out forwards;
+}
+@keyframes bomb-sym-fade {
+	0%   { opacity: 1; transform: translate(-50%, -50%) scale(1.15); filter: blur(0); }
+	35%  { opacity: 1; transform: translate(-50%, -50%) scale(1.15); filter: blur(0); }
+	75%  { opacity: 0; transform: translate(-50%, -50%) scale(1.6);  filter: blur(7px); }
+	100% { opacity: 0; transform: translate(-50%, -50%) scale(1.6);  filter: blur(7px); }
+}
+
+/* Sortie de l'immunité : grossit légèrement au centre, puis se contracte jusqu'à disparaître. */
+#game .effect.immunity-out {
+	animation: immunity-out 520ms cubic-bezier(0.5, 0, 0.7, 1) forwards;
+}
+@keyframes immunity-out {
+	0%   { transform: translate(-50%, -50%) scale(1);    opacity: 1; }
+	30%  { transform: translate(-50%, -50%) scale(1.18); opacity: 1; }
+	100% { transform: translate(-50%, -50%) scale(0);    opacity: 0; }
+}
+
+/* APNG de transition Invert (O→X / X→O), posé sur la case, calé sur la taille du symbole. */
+#game .sym-transi {
+	position: fixed;
+	transform: translate(-50%, -50%) scale(1.15); /* même cadrage que .cell-sym */
+	object-fit: contain;
+	z-index: 490; /* au-dessus du plateau, sous les anims d'effet (bombe 500) */
+	pointer-events: none;
+}
+
+/* --- Panneau debug (à retirer en prod) --- */
+#game #debug-panel {
+	position: fixed;
+	top: 44px;
+	right: 12px;
+	z-index: 1100; /* au-dessus de l'overlay de fin pour pouvoir basculer/fermer */
+	display: flex;
+	gap: 6px;
+}
+#game .debug-btn {
+	font-family: "Space Mono", monospace;
+	font-size: 11px;
+	padding: 6px 10px;
+	background: rgba(0, 0, 0, 0.6);
+	color: #FFFFFF;
+	border: 1px solid #FFFFFF;
+	cursor: pointer;
+}
+
+/* --- Overlay de fin (VICTOIRE / DEFAITE) --- */
+#game #gameover {
+	position: fixed;
+	inset: 0;
+	z-index: 1000;
+	background: rgba(8, 10, 8, 0.85); /* couche opaque qui assombrit tout l'écran */
 	display: flex;
 	align-items: center;
+	justify-content: center;
 }
-
-.card {
-	cursor: pointer;
-	padding: 8px 12px;
-	margin: 4px;
-	border: 1px solid #888;
-}
-
-.card.selected {
-	outline: 2px solid #4af;
-}
-
-.card.symbol {
-	margin-left: 24px; /* décalage "soit un joker, soit ton symbole" */
-}
-
-/* --- Flèches de direction (nomad) --- */
-.arrow {
-	margin: 2px;
-}
-
-/* --- Flèches de coin (resize) : par-dessus la grille --- */
-.corner {
+#game .go-art {
 	position: absolute;
-	z-index: 10;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover; /* écrans de fin conçus en plein écran */
+}
+#game .go-text {
+	color: #FFFFFF;
+	font-family: "Space Mono", monospace;
+	font-size: 64px;
+	font-weight: 700;
+	letter-spacing: 4px;
 }
 
-.corner-tl { top: 0;    left: 0; }
-.corner-tr { top: 0;    right: 0; }
-.corner-bl { bottom: 0; left: 0; }
-.corner-br { bottom: 0; right: 0; }
+/* --- Pied de page : épinglé aux coins bas de l'écran (SESSION à gauche, tictacdie à droite) --- */
+#game .footer {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	height: 36px;
+	padding: 0 24px;
+	box-sizing: border-box;
+	font-size: 10px;
+	color: #8A8470;
+	z-index: 4;
+}
