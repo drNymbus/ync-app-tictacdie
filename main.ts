@@ -6,6 +6,7 @@ import { WebSocketServer, WebSocket } from "npm:ws";
 import * as msg from "./shared/protocol.ts";
 import * as handler from "./handler.ts";
 
+const basePath = "/tictacdie";
 const port = Number(Deno.env.get("PORT")) || 3000;
 
 // content-type par extension (tout est servi depuis client/ : html/js/css + assets).
@@ -25,8 +26,10 @@ const page = (f: string) => readFileSync(join(Deno.cwd(), "client", f));
 const server = createServer((req, res) => {
 	// new URL : pathname normalisé (".." résolu, pas de path traversal) et SANS query string
 	// (les assets sont demandés avec un cache-buster "?t=..." qu'il faut retirer du chemin de fichier).
-	const url = new URL(req.url!, "http://x");
-	const path = url.pathname === "/" ? "index.html" : url.pathname;
+	console.log(req.url, req.url.slice(basePath.length));
+	// const url = new URL(req.url!, "http://x");
+	const path = req.url.slice(basePath.length) === "/" ? "index.html" : req.url.slice(basePath.length);
+	console.log(path);
 	const ext = path.slice(path.lastIndexOf("."));
 
 	try {
